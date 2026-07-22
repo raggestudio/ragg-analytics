@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { leerCsv } from "../../services/csvService";
 import { obtenerEmpresas } from "../../services/empresaService";
 import { obtenerSucursalesPorEmpresa } from "../../services/sucursalService";
@@ -82,6 +86,7 @@ export function ImportacionesPage() {
   const [calculando, setCalculando] = useState(false);
   const [rentabilidad, setRentabilidad] =
     useState<RentabilidadConCanal[]>([]);
+  const calculandoRef = useRef(false);
 
   useEffect(() => {
     cargarEmpresas();
@@ -478,36 +483,58 @@ export function ImportacionesPage() {
   }
 
   async function calcularRentabilidad() {
-    try {
-      if (!empresaId || !periodoId || !sucursalId) {
-        throw new Error("Seleccioná empresa, período y sucursal.");
-      }
+  /*
+   * El ref se actualiza inmediatamente y evita que
+   * dos clics ejecuten el cálculo simultáneamente.
+   */
+  if (calculandoRef.current) return;
 
-      setCalculando(true);
-      setMensaje("Calculando Paradise + PedidosYa...");
+  calculandoRef.current = true;
 
-      const resultado = await calcularRentabilidadPeriodo({
+  try {
+    if (
+      !empresaId ||
+      !periodoId ||
+      !sucursalId
+    ) {
+      throw new Error(
+        "Seleccioná empresa, período y sucursal."
+      );
+    }
+
+    setCalculando(true);
+    setMensaje(
+      "Calculando Paradise + PedidosYa..."
+    );
+
+    const resultado =
+      await calcularRentabilidadPeriodo({
         empresa_id: empresaId,
         periodo_id: periodoId,
         sucursal_id: sucursalId,
       });
 
-      setMensaje(
-        `Análisis recalculado. Paradise: ${resultado.productos_paradise}. ` +
-          `PedidosYa: ${resultado.productos_pedidosya}. ` +
-          `Costos del canal PedidosYa: ${moneda(
-            resultado.costos_canal_pedidosya
-          )}. Sin costo: ${resultado.productos_sin_costo}.`
-      );
+    setMensaje(
+      `Análisis recalculado. Paradise: ${resultado.productos_paradise}. ` +
+        `PedidosYa: ${resultado.productos_pedidosya}. ` +
+        `Costos del canal PedidosYa: ${moneda(
+          resultado.costos_canal_pedidosya
+        )}. Sin costo: ${resultado.productos_sin_costo}.`
+    );
 
-      await cargarRentabilidad();
-    } catch (error: any) {
-      console.error(error);
-      setMensaje(error?.message || "Error calculando rentabilidad");
-    } finally {
-      setCalculando(false);
-    }
+    await cargarRentabilidad();
+  } catch (error: any) {
+    console.error(error);
+
+    setMensaje(
+      error?.message ||
+        "Error calculando rentabilidad"
+    );
+  } finally {
+    calculandoRef.current = false;
+    setCalculando(false);
   }
+}
 
   return (
     <div>
@@ -632,12 +659,15 @@ export function ImportacionesPage() {
         />
 
         <button
-          style={button}
-          onClick={calcularRentabilidad}
-          disabled={calculando}
-        >
-          {calculando ? "Recalculando..." : "Recalcular análisis"}
-        </button>
+  type="button"
+  style={button}
+  onClick={calcularRentabilidad}
+  disabled={calculando}
+>
+  {calculando
+    ? "Recalculando..."
+    : "Recalcular análisis"}
+</button>
       </section>
 
       {rentabilidad.length > 0 && (

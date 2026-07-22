@@ -87,13 +87,23 @@ const [saboresPedidosYa, setSaboresPedidosYa] =
 });
 
   useEffect(() => {
-    cargarInicial();
-  }, []);
+  cargarInicial();
+}, []);
 
-  useEffect(() => {
-    if (empresaId && periodoId) {
-      cargarDashboard();
-      useEffect(() => {
+useEffect(() => {
+  if (empresaId && periodoId) {
+    cargarDashboard();
+  }
+}, [
+  empresaId,
+  periodoId,
+  sucursalId,
+  modoAnalisis,
+  periodoDesdeId,
+  periodoHastaId,
+]);
+
+useEffect(() => {
   if (!empresaId || !periodoId) return;
 
   localStorage.setItem(
@@ -108,16 +118,6 @@ useEffect(() => {
     modoAnalisis
   );
 }, [modoAnalisis]);
-    }
-  
-  }, [
-  empresaId,
-  periodoId,
-  sucursalId,
-  modoAnalisis,
-  periodoDesdeId,
-  periodoHastaId,
-]);
 
   async function cargarInicial() {
     const empresasData = await obtenerEmpresas();

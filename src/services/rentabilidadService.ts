@@ -355,13 +355,23 @@ function construirFilas(input: {
   periodo_id: string;
   contexto: ContextoCostos;
   vinculaciones: Map<string, string>;
-  costoCanalTotal?: number;
-  detalleCostoCanal?: string;
+
+  descuentoLocalTotal?: number;
+  comisionTotal?: number;
+  ivaComisionTotal?: number;
+  tarifaPagoLineaTotal?: number;
+  retencionRecuperableTotal?: number;
+
   contadores: Contadores;
 }) {
-  const ventasCanal = input.productos.reduce(
+  const ventasBrutasCanal = input.productos.reduce(
     (total, producto) =>
-      total + Number(producto.total ?? producto.ventas ?? 0),
+      total +
+      Number(
+        producto.total ??
+          producto.ventas ??
+          0
+      ),
     0
   );
 
@@ -372,49 +382,137 @@ function construirFilas(input: {
       vinculaciones: input.vinculaciones,
     });
 
+    const ventasBrutas = costo.ventas;
+
     const participacion =
-      ventasCanal > 0 ? costo.ventas / ventasCanal : 0;
+      ventasBrutasCanal > 0
+        ? ventasBrutas / ventasBrutasCanal
+        : 0;
+
+    const descuentoLocalAsignado =
+      input.canal === "PedidosYa"
+        ? Number(
+            input.descuentoLocalTotal || 0
+          ) * participacion
+        : 0;
+
+    const comisionAsignada =
+      input.canal === "PedidosYa"
+        ? Number(input.comisionTotal || 0) *
+          participacion
+        : 0;
+
+    const ivaComisionAsignado =
+      input.canal === "PedidosYa"
+        ? Number(
+            input.ivaComisionTotal || 0
+          ) * participacion
+        : 0;
+
+    const tarifaPagoLineaAsignada =
+      input.canal === "PedidosYa"
+        ? Number(
+            input.tarifaPagoLineaTotal || 0
+          ) * participacion
+        : 0;
+
+    const retencionAsignada =
+      input.canal === "PedidosYa"
+        ? Number(
+            input.retencionRecuperableTotal || 0
+          ) * participacion
+        : 0;
+
+    const ventasEfectivas = Math.max(
+      ventasBrutas -
+        descuentoLocalAsignado,
+      0
+    );
 
     const costoCanalAsignado =
-      input.canal === "PedidosYa"
-        ? Number(input.costoCanalTotal || 0) * participacion
-        : 0;
+      comisionAsignada +
+      ivaComisionAsignado +
+      tarifaPagoLineaAsignada;
 
     if (!costo.tieneCosto) {
       input.contadores.productosSinCosto += 1;
-      input.contadores.ventasSinCosto += costo.ventas;
+
+      input.contadores.ventasSinCosto +=
+        ventasEfectivas;
+
       input.contadores.nombresSinCosto.push(
         `${input.canal}: ${producto.nombre_producto}`
       );
     }
 
     const margen = costo.tieneCosto
-      ? costo.ventas - costo.costoTotal - costoCanalAsignado
+      ? ventasEfectivas -
+        costo.costoTotal -
+        costoCanalAsignado
       : 0;
+
+    const detallePedidosYa =
+      input.canal === "PedidosYa"
+        ? [
+            `Venta bruta: $${ventasBrutas.toFixed(2)}`,
+            `Descuento local: $${descuentoLocalAsignado.toFixed(2)}`,
+            `Comisión 23%: $${comisionAsignada.toFixed(2)}`,
+            `IVA comisión: $${ivaComisionAsignado.toFixed(2)}`,
+            `Tarifa pago online: $${tarifaPagoLineaAsignada.toFixed(2)}`,
+            `Retención recuperable: $${retencionAsignada.toFixed(2)}`,
+          ].join(". ")
+        : "";
 
     return {
       empresa_id: input.empresa_id,
       periodo_id: input.periodo_id,
-      nombre_producto: producto.nombre_producto,
-      categoria: producto.categoria || null,
+
+      nombre_producto:
+        producto.nombre_producto,
+
+      categoria:
+        producto.categoria || null,
+
       cantidad: costo.cantidad,
-      ventas: costo.ventas,
+
+      /*
+       * En ventas se guarda el ingreso económico real:
+       * venta bruta menos descuento financiado por Duna.
+       */
+      ventas: ventasEfectivas,
+      ventas_brutas: ventasBrutas,
+      descuento_local:
+        descuentoLocalAsignado,
+
       tipo_calculo: costo.tipoCalculo,
       costo_unitario: costo.costoUnitario,
       costo_total: costo.costoTotal,
-      comision: costoCanalAsignado,
+
+      /*
+       * Comisión conserva únicamente el 23%.
+       */
+      comision: comisionAsignada,
+      iva_comision: ivaComisionAsignado,
+      tarifa_pago_linea:
+        tarifaPagoLineaAsignada,
+      retencion_recuperable:
+        retencionAsignada,
+
       margen,
+
       margen_porcentaje:
-        costo.tieneCosto && costo.ventas > 0
-          ? (margen / costo.ventas) * 100
+        costo.tieneCosto &&
+        ventasEfectivas > 0
+          ? (margen / ventasEfectivas) * 100
           : 0,
+
       origen_costo: costo.origenCosto,
+
       detalle_costo:
-        input.canal === "PedidosYa" && costoCanalAsignado > 0
-          ? `${costo.detalleCosto}. ${
-              input.detalleCostoCanal || "Costo del canal PedidosYa"
-            }: $${costoCanalAsignado.toFixed(2)}`
+        input.canal === "PedidosYa"
+          ? `${costo.detalleCosto}. ${detallePedidosYa}`
           : costo.detalleCosto,
+
       canal: input.canal,
     };
   });
@@ -463,29 +561,158 @@ async function cargarCostosCanalPedidosYa(
 ) {
   let query = supabase
     .from("pedidosya_pedidos")
-    .select("comision, cargos, impuestos")
+    .select(`
+      estado_pedido,
+      total_parcial,
+      descuento_local,
+      descuento_pedidosya,
+      comision,
+      tarifa_pago_linea,
+      cargos,
+      cargo_impositivo,
+      impuestos,
+      ingreso_estimado
+    `)
     .eq("empresa_id", input.empresa_id)
     .eq("periodo_id", input.periodo_id);
 
   if (input.sucursal_id) {
-    query = query.eq("sucursal_id", input.sucursal_id);
+    query = query.eq(
+      "sucursal_id",
+      input.sucursal_id
+    );
+  } else {
+    query = query.is("sucursal_id", null);
   }
 
   const { data, error } = await query;
+
   if (error) throw error;
 
-  const resumen = (data || []).reduce(
-    (acc, pedido: any) => ({
-      comision: acc.comision + Number(pedido.comision || 0),
-      cargos: acc.cargos + Number(pedido.cargos || 0),
-      impuestos: acc.impuestos + Number(pedido.impuestos || 0),
-    }),
-    { comision: 0, cargos: 0, impuestos: 0 }
+  const pedidosContabilizables = (
+    data || []
+  ).filter((pedido: any) => {
+    const estado = normalizar(
+      pedido.estado_pedido || ""
+    );
+
+    if (!estado) return true;
+
+    return [
+      "entregado",
+      "realizado",
+      "completado",
+      "completed",
+      "delivered",
+    ].includes(estado);
+  });
+
+  const resumenBase =
+    pedidosContabilizables.reduce(
+      (acc, pedido: any) => ({
+        ventas_brutas:
+          acc.ventas_brutas +
+          Number(
+            pedido.total_parcial || 0
+          ),
+
+        descuento_local:
+          acc.descuento_local +
+          Number(
+            pedido.descuento_local || 0
+          ),
+
+        descuento_pedidosya:
+          acc.descuento_pedidosya +
+          Number(
+            pedido.descuento_pedidosya || 0
+          ),
+
+        comision:
+          acc.comision +
+          Number(pedido.comision || 0),
+
+        tarifa_pago_linea:
+          acc.tarifa_pago_linea +
+          Number(
+            pedido.tarifa_pago_linea || 0
+          ),
+
+        cargos:
+          acc.cargos +
+          Number(pedido.cargos || 0),
+
+        cargo_impositivo:
+          acc.cargo_impositivo +
+          Number(
+            pedido.cargo_impositivo ??
+              pedido.impuestos ??
+              0
+          ),
+
+        ingreso_estimado:
+          acc.ingreso_estimado +
+          Number(
+            pedido.ingreso_estimado || 0
+          ),
+      }),
+      {
+        ventas_brutas: 0,
+        descuento_local: 0,
+        descuento_pedidosya: 0,
+        comision: 0,
+        tarifa_pago_linea: 0,
+        cargos: 0,
+        cargo_impositivo: 0,
+        ingreso_estimado: 0,
+      }
+    );
+
+  /*
+   * El IVA se calcula sobre el total de la comisión:
+   * comisión 23% × IVA 22%.
+   */
+  const ivaComision =
+    resumenBase.comision * 0.22;
+
+  /*
+   * El resto del cargo impositivo es una retención
+   * recuperable y no se descuenta del margen.
+   */
+  const retencionRecuperable = Math.max(
+    resumenBase.cargo_impositivo -
+      ivaComision,
+    0
   );
 
+  const ventaEfectiva = Math.max(
+    resumenBase.ventas_brutas -
+      resumenBase.descuento_local,
+    0
+  );
+
+  const costoCanal =
+    resumenBase.comision +
+    ivaComision +
+    resumenBase.tarifa_pago_linea;
+
   return {
-    ...resumen,
-    total: resumen.comision + resumen.cargos + resumen.impuestos,
+    ...resumenBase,
+
+    pedidos:
+      pedidosContabilizables.length,
+
+    venta_efectiva: ventaEfectiva,
+    iva_comision: ivaComision,
+
+    retencion_recuperable:
+      retencionRecuperable,
+
+    /*
+     * No incluye retenciones, descuentos financiados
+     * por PedidosYa ni la columna genérica Cargos.
+     */
+    total: costoCanal,
   };
 }
 
@@ -512,14 +739,28 @@ export async function calcularRentabilidadPeriodo(
     cargarCostosCanalPedidosYa(input),
   ]);
 
-  const deleteQuery = supabase
-    .from("rentabilidad_periodo")
-    .delete()
-    .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id);
+  let deleteQuery = supabase
+  .from("rentabilidad_periodo")
+  .delete()
+  .eq("empresa_id", input.empresa_id)
+  .eq("periodo_id", input.periodo_id);
 
-  const { error: deleteError } = await deleteQuery;
-  if (deleteError) throw deleteError;
+if (input.sucursal_id) {
+  deleteQuery = deleteQuery.eq(
+    "sucursal_id",
+    input.sucursal_id
+  );
+} else {
+  deleteQuery = deleteQuery.is(
+    "sucursal_id",
+    null
+  );
+}
+
+const { error: deleteError } =
+  await deleteQuery;
+
+if (deleteError) throw deleteError;
 
   const contadores: Contadores = {
     productosSinCosto: 0,
@@ -538,17 +779,31 @@ export async function calcularRentabilidadPeriodo(
   });
 
   const filasPedidosYa = construirFilas({
-    productos: productosPedidosYa,
-    canal: "PedidosYa",
-    empresa_id: input.empresa_id,
-    periodo_id: input.periodo_id,
-    contexto,
-    vinculaciones: contexto.vinculacionesPedidosYa,
-    costoCanalTotal: costosPedidosYa.total,
-    detalleCostoCanal:
-      `Comisión/cargos/impuestos PedidosYa prorrateados`,
-    contadores,
-  });
+  productos: productosPedidosYa,
+  canal: "PedidosYa",
+  empresa_id: input.empresa_id,
+  periodo_id: input.periodo_id,
+  contexto,
+  vinculaciones:
+    contexto.vinculacionesPedidosYa,
+
+  descuentoLocalTotal:
+    costosPedidosYa.descuento_local,
+
+  comisionTotal:
+    costosPedidosYa.comision,
+
+  ivaComisionTotal:
+    costosPedidosYa.iva_comision,
+
+  tarifaPagoLineaTotal:
+    costosPedidosYa.tarifa_pago_linea,
+
+  retencionRecuperableTotal:
+    costosPedidosYa.retencion_recuperable,
+
+  contadores,
+});
 
   const filas = [...filasParadise, ...filasPedidosYa];
 
@@ -567,12 +822,50 @@ export async function calcularRentabilidadPeriodo(
     costo_promedio_kg: contexto.costoPromedioKg,
     kilos_produccion: 0,
     costo_total_produccion: 0,
-    comision_pedidosya: costosPedidosYa.comision,
-    cargos_pedidosya: costosPedidosYa.cargos,
-    impuestos_pedidosya: costosPedidosYa.impuestos,
-    costos_canal_pedidosya: costosPedidosYa.total,
-    productos_sin_costo: contadores.productosSinCosto,
-    ventas_sin_costo: contadores.ventasSinCosto,
-    nombres_sin_costo: contadores.nombresSinCosto,
+    comision_pedidosya:
+  costosPedidosYa.comision,
+
+iva_comision_pedidosya:
+  costosPedidosYa.iva_comision,
+
+comision_mas_iva_pedidosya:
+  costosPedidosYa.comision +
+  costosPedidosYa.iva_comision,
+
+tarifa_pago_linea_pedidosya:
+  costosPedidosYa.tarifa_pago_linea,
+
+descuento_local_pedidosya:
+  costosPedidosYa.descuento_local,
+
+descuento_pedidosya:
+  costosPedidosYa.descuento_pedidosya,
+
+ventas_brutas_pedidosya:
+  costosPedidosYa.ventas_brutas,
+
+ventas_efectivas_pedidosya:
+  costosPedidosYa.venta_efectiva,
+
+retencion_recuperable_pedidosya:
+  costosPedidosYa.retencion_recuperable,
+
+cargo_impositivo_pedidosya:
+  costosPedidosYa.cargo_impositivo,
+
+cargos_pedidosya:
+  costosPedidosYa.cargos,
+
+costos_canal_pedidosya:
+  costosPedidosYa.total,
+
+productos_sin_costo:
+  contadores.productosSinCosto,
+
+ventas_sin_costo:
+  contadores.ventasSinCosto,
+
+nombres_sin_costo:
+  contadores.nombresSinCosto,
   };
 }

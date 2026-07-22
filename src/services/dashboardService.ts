@@ -19,6 +19,13 @@ export type DashboardResumen = {
   sabores_producidos: number;
   productos_sin_revisar: number;
   costos_canal: number;
+  comision_pedidosya: number;
+iva_comision_pedidosya: number;
+comision_mas_iva_pedidosya: number;
+tarifa_pago_linea_pedidosya: number;
+retencion_recuperable_pedidosya: number;
+descuento_local_pedidosya: number;
+ventas_brutas_pedidosya: number;
   ventas_paradise: number;
   es_restaurante: boolean;
   costo_productos_pedidosya: number;
@@ -143,7 +150,7 @@ export async function obtenerDashboardResumen(input: {
 
   let pedidosDetalleQuery = supabase
     .from("pedidosya_pedidos")
-    .select("id")
+    .select("id, estado_pedido")
     .eq("empresa_id", input.empresa_id)
     .eq("periodo_id", input.periodo_id);
   if (input.sucursal_id) {
@@ -151,6 +158,23 @@ export async function obtenerDashboardResumen(input: {
   }
   const { data: pedidosDetalle, error: pedidosDetalleError } = await pedidosDetalleQuery;
   if (pedidosDetalleError) throw pedidosDetalleError;
+  const pedidosDetalleContabilizables = (
+  pedidosDetalle || []
+).filter((pedido: any) => {
+  const estado = normalizar(
+    pedido.estado_pedido || ""
+  );
+
+  if (!estado) return true;
+
+  return [
+    "entregado",
+    "realizado",
+    "completado",
+    "completed",
+    "delivered",
+  ].includes(estado);
+});
 
   const { data: elaboraciones, error: elaboracionesError } = await supabase
     .from("elaboraciones")
@@ -188,10 +212,7 @@ export async function obtenerDashboardResumen(input: {
     (acc, item: any) => acc + Number(item.margen || 0),
     0
   );
-  const costosCanal = (rentabilidad || []).reduce(
-    (acc, item: any) => acc + Number(item.comision || 0),
-    0
-  );
+  
   const esRestaurante = (fuentes || []).some(
     (item: any) => item.fuente === "Paradise"
   );
@@ -204,6 +225,63 @@ export async function obtenerDashboardResumen(input: {
   const filasPedidosYa = (rentabilidad || []).filter(
     (item: any) => item.canal === "PedidosYa"
   );
+  const comisionPedidosYa = filasPedidosYa.reduce(
+  (total: number, item: any) =>
+    total + Number(item.comision || 0),
+  0
+);
+
+const ivaComisionPedidosYa = filasPedidosYa.reduce(
+  (total: number, item: any) =>
+    total + Number(item.iva_comision || 0),
+  0
+);
+
+const tarifaPagoLineaPedidosYa =
+  filasPedidosYa.reduce(
+    (total: number, item: any) =>
+      total +
+      Number(item.tarifa_pago_linea || 0),
+    0
+  );
+
+const retencionRecuperablePedidosYa =
+  filasPedidosYa.reduce(
+    (total: number, item: any) =>
+      total +
+      Number(
+        item.retencion_recuperable || 0
+      ),
+    0
+  );
+
+const descuentoLocalPedidosYa =
+  filasPedidosYa.reduce(
+    (total: number, item: any) =>
+      total +
+      Number(item.descuento_local || 0),
+    0
+  );
+
+const ventasBrutasPedidosYa =
+  filasPedidosYa.reduce(
+    (total: number, item: any) =>
+      total +
+      Number(
+        item.ventas_brutas ??
+          item.ventas ??
+          0
+      ),
+    0
+  );
+
+const comisionMasIvaPedidosYa =
+  comisionPedidosYa +
+  ivaComisionPedidosYa;
+
+const costosCanal =
+  comisionMasIvaPedidosYa +
+  tarifaPagoLineaPedidosYa;
   const costoProductosPedidosYa = filasPedidosYa.reduce(
     (acc: number, item: any) => acc + Number(item.costo_total || 0), 0
   );
@@ -221,7 +299,7 @@ export async function obtenerDashboardResumen(input: {
     0
   );
   const pedidosPedidosYa = esRestaurante
-    ? (pedidosDetalle || []).length
+    ? pedidosDetalleContabilizables.length
     : pedidosPedidosYaOriginal;
   const ventasPedidosYa = esRestaurante
     ? ventasPedidosYaRentabilidad
@@ -313,15 +391,48 @@ export async function obtenerDashboardResumen(input: {
 
     productos_sin_revisar: productosSinRevisar,
     costos_canal: costosCanal,
-    ventas_paradise: ventasParadise,
-    es_restaurante: esRestaurante,
-    costo_productos_pedidosya: costoProductosPedidosYa,
-    margen_pedidosya: margenPedidosYa,
-    margen_porcentaje_pedidosya:
-      ventasPedidosYa > 0 ? (margenPedidosYa / ventasPedidosYa) * 100 : 0,
+
+comision_pedidosya:
+  comisionPedidosYa,
+
+iva_comision_pedidosya:
+  ivaComisionPedidosYa,
+
+comision_mas_iva_pedidosya:
+  comisionMasIvaPedidosYa,
+
+tarifa_pago_linea_pedidosya:
+  tarifaPagoLineaPedidosYa,
+
+retencion_recuperable_pedidosya:
+  retencionRecuperablePedidosYa,
+
+descuento_local_pedidosya:
+  descuentoLocalPedidosYa,
+
+ventas_brutas_pedidosya:
+  ventasBrutasPedidosYa,
+
+ventas_paradise: ventasParadise,
+
+es_restaurante: esRestaurante,
+
+costo_productos_pedidosya:
+  costoProductosPedidosYa,
+
+margen_pedidosya:
+  margenPedidosYa,
+
+margen_porcentaje_pedidosya:
+  ventasPedidosYa > 0
+    ? (margenPedidosYa / ventasPedidosYa) * 100
+    : 0,
   };
 }
-function sumarResumenes(resumenes: DashboardResumen[]): DashboardResumen {
+
+function sumarResumenes(
+  resumenes: DashboardResumen[]
+): DashboardResumen {
   const ventasTotales = resumenes.reduce(
     (total, item) => total + Number(item.ventas_totales || 0),
     0
@@ -338,7 +449,63 @@ function sumarResumenes(resumenes: DashboardResumen[]): DashboardResumen {
   const costosCanal = resumenes.reduce(
     (total, item) => total + Number(item.costos_canal || 0), 0
   );
+const comisionPedidosYa = resumenes.reduce(
+  (total, item) =>
+    total +
+    Number(item.comision_pedidosya || 0),
+  0
+);
 
+const ivaComisionPedidosYa = resumenes.reduce(
+  (total, item) =>
+    total +
+    Number(
+      item.iva_comision_pedidosya || 0
+    ),
+  0
+);
+
+const tarifaPagoLineaPedidosYa =
+  resumenes.reduce(
+    (total, item) =>
+      total +
+      Number(
+        item.tarifa_pago_linea_pedidosya ||
+          0
+      ),
+    0
+  );
+
+const retencionRecuperablePedidosYa =
+  resumenes.reduce(
+    (total, item) =>
+      total +
+      Number(
+        item.retencion_recuperable_pedidosya ||
+          0
+      ),
+    0
+  );
+
+const descuentoLocalPedidosYa =
+  resumenes.reduce(
+    (total, item) =>
+      total +
+      Number(
+        item.descuento_local_pedidosya || 0
+      ),
+    0
+  );
+
+const ventasBrutasPedidosYa =
+  resumenes.reduce(
+    (total, item) =>
+      total +
+      Number(
+        item.ventas_brutas_pedidosya || 0
+      ),
+    0
+  );
   const pedidosPedidosYa = resumenes.reduce(
     (total, item) => total + Number(item.pedidos_pedidosya || 0),
     0
@@ -415,6 +582,27 @@ function sumarResumenes(resumenes: DashboardResumen[]): DashboardResumen {
       ...resumenes.map((item) => Number(item.productos_sin_revisar || 0))
     ),
     costos_canal: costosCanal,
+    comision_pedidosya:
+  comisionPedidosYa,
+
+iva_comision_pedidosya:
+  ivaComisionPedidosYa,
+
+comision_mas_iva_pedidosya:
+  comisionPedidosYa +
+  ivaComisionPedidosYa,
+
+tarifa_pago_linea_pedidosya:
+  tarifaPagoLineaPedidosYa,
+
+retencion_recuperable_pedidosya:
+  retencionRecuperablePedidosYa,
+
+descuento_local_pedidosya:
+  descuentoLocalPedidosYa,
+
+ventas_brutas_pedidosya:
+  ventasBrutasPedidosYa,
     ventas_paradise: resumenes.reduce(
       (total, item) => total + Number(item.ventas_paradise || 0), 0
     ),

@@ -613,88 +613,161 @@ function textoComparacion() {
             <h3>PedidoYa</h3>
 
             <div style={metricGrid}>
-              <Metric
-                title="Facturación PedidoYa"
-                value={moneda(resumen.ventas_pedidosya)}
-                variation={textoVariacion(
-                  variacionPorcentual(resumen.ventas_pedidosya, anterior?.ventas_pedidosya),
-                  "porcentaje"
-                )}
-                variationColor={colorVariacion(
-                  variacionPorcentual(resumen.ventas_pedidosya, anterior?.ventas_pedidosya)
-                )}
-              />
+  {resumen.es_restaurante ? (
+    <>
+      <Metric
+        title="Facturación bruta PedidosYa"
+        value={moneda(
+          resumen.ventas_brutas_pedidosya
+        )}
+      />
 
-              <Metric
-                title="Pedidos"
-                value={resumen.pedidos_pedidosya}
-                variation={textoVariacion(
-                  variacionPorcentual(resumen.pedidos_pedidosya, anterior?.pedidos_pedidosya),
-                  "porcentaje"
-                )}
-                variationColor={colorVariacion(
-                  variacionPorcentual(resumen.pedidos_pedidosya, anterior?.pedidos_pedidosya)
-                )}
-              />
+      <Metric
+        title="Descuentos financiados por Duna"
+        value={moneda(
+          resumen.descuento_local_pedidosya
+        )}
+      />
 
-              <Metric
-                title="Ticket promedio"
-                value={moneda(resumen.ticket_pedidosya)}
-                variation={textoVariacion(
-                  variacionPorcentual(resumen.ticket_pedidosya, anterior?.ticket_pedidosya),
-                  "porcentaje"
-                )}
-                variationColor={colorVariacion(
-                  variacionPorcentual(resumen.ticket_pedidosya, anterior?.ticket_pedidosya)
-                )}
-              />
+      <Metric
+        title="Venta efectiva PedidosYa"
+        value={moneda(
+          resumen.ventas_pedidosya
+        )}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.ventas_pedidosya,
+            anterior?.ventas_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.ventas_pedidosya,
+            anterior?.ventas_pedidosya
+          )
+        )}
+      />
 
-              {!resumen.es_restaurante && (
-                <>
-                  <Metric title="Delivery" value={moneda(resumen.delivery_pedidosya)} />
-                  <Metric title="Pickup" value={moneda(resumen.pickup_pedidosya)} />
-                </>
-              )}
+      <Metric
+        title="Pedidos entregados"
+        value={resumen.pedidos_pedidosya}
+      />
 
-              <Metric
-                title="Participación"
-                value={porcentaje(resumen.participacion_pedidosya)}
-                variation={textoVariacion(
-                  variacionPuntos(
-                    resumen.participacion_pedidosya,
-                    anterior?.participacion_pedidosya
-                  ),
-                  "puntos"
-                )}
-                variationColor={colorVariacion(
-                  variacionPuntos(
-                    resumen.participacion_pedidosya,
-                    anterior?.participacion_pedidosya
-                  )
-                )}
-              />
-              {resumen.es_restaurante && (
-                <Metric title="Comisión PedidosYa" value={moneda(resumen.costos_canal)} />
-              )}
-              {resumen.es_restaurante && (
-                <Metric
-                  title="Costo de productos"
-                  value={moneda(resumen.costo_productos_pedidosya)}
-                />
-              )}
-              {resumen.es_restaurante && (
-                <Metric
-                  title="Ganancia neta PedidosYa"
-                  value={moneda(resumen.margen_pedidosya)}
-                />
-              )}
-              {resumen.es_restaurante && (
-                <Metric
-                  title="Margen PedidosYa"
-                  value={porcentaje(resumen.margen_porcentaje_pedidosya)}
-                />
-              )}
-            </div>
+      <Metric
+        title="Ticket efectivo promedio"
+        value={moneda(
+          resumen.ticket_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Participación"
+        value={porcentaje(
+          resumen.participacion_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Comisión PedidosYa 23%"
+        value={moneda(
+          resumen.comision_pedidosya
+        )}
+      />
+
+      <Metric
+        title="IVA de la comisión"
+        value={moneda(
+          resumen.iva_comision_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Comisión 23% + IVA"
+        value={moneda(
+          resumen.comision_mas_iva_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Tarifa de pago en línea"
+        value={moneda(
+          resumen.tarifa_pago_linea_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Retención recuperable"
+        value={moneda(
+          resumen.retencion_recuperable_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Costo de productos"
+        value={moneda(
+          resumen.costo_productos_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Ganancia neta PedidosYa"
+        value={moneda(
+          resumen.margen_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Margen neto PedidosYa"
+        value={porcentaje(
+          resumen.margen_porcentaje_pedidosya
+        )}
+      />
+    </>
+  ) : (
+    <>
+      <Metric
+        title="Facturación PedidosYa"
+        value={moneda(
+          resumen.ventas_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Pedidos"
+        value={resumen.pedidos_pedidosya}
+      />
+
+      <Metric
+        title="Ticket promedio"
+        value={moneda(
+          resumen.ticket_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Delivery"
+        value={moneda(
+          resumen.delivery_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Pickup"
+        value={moneda(
+          resumen.pickup_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Participación"
+        value={porcentaje(
+          resumen.participacion_pedidosya
+        )}
+      />
+    </>
+  )}
+</div>
 
             {resumen.es_restaurante && topPedidosYa.length > 0 && (
               <div style={{ marginTop: 24 }}>

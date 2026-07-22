@@ -69,7 +69,22 @@ const [saboresPedidosYa, setSaboresPedidosYa] =
   useState<ResumenCostosSaboresPedidosYa | null>(null);
   const [modoAnalisis, setModoAnalisis] = useState<
   "mensual" | "trimestral" | "anual" | "personalizado"
->("mensual");
+>(() => {
+  const guardado = localStorage.getItem(
+    "dashboard-modo-analisis"
+  );
+
+  if (
+    guardado === "mensual" ||
+    guardado === "trimestral" ||
+    guardado === "anual" ||
+    guardado === "personalizado"
+  ) {
+    return guardado;
+  }
+
+  return "mensual";
+});
 
   useEffect(() => {
     cargarInicial();
@@ -78,7 +93,23 @@ const [saboresPedidosYa, setSaboresPedidosYa] =
   useEffect(() => {
     if (empresaId && periodoId) {
       cargarDashboard();
+      useEffect(() => {
+  if (!empresaId || !periodoId) return;
+
+  localStorage.setItem(
+    `dashboard-periodo-${empresaId}`,
+    periodoId
+  );
+}, [empresaId, periodoId]);
+
+useEffect(() => {
+  localStorage.setItem(
+    "dashboard-modo-analisis",
+    modoAnalisis
+  );
+}, [modoAnalisis]);
     }
+  
   }, [
   empresaId,
   periodoId,
@@ -102,7 +133,17 @@ const [saboresPedidosYa, setSaboresPedidosYa] =
       setSucursales(sucursalesData);
       setPeriodos(periodosData);
       setSucursalId("");
-      const actualId = obtenerPeriodoPredeterminado(periodosData);
+      const periodoGuardado = localStorage.getItem(
+  `dashboard-periodo-${empresa.id}`
+);
+
+const actualId =
+  periodoGuardado &&
+  periodosData.some(
+    (periodo) => periodo.id === periodoGuardado
+  )
+    ? periodoGuardado
+    : obtenerPeriodoPredeterminado(periodosData);
       setPeriodoId(actualId);
       setPeriodoDesdeId(actualId);
       setPeriodoHastaId(actualId);
@@ -118,7 +159,17 @@ const [saboresPedidosYa, setSaboresPedidosYa] =
 
     setSucursales(sucursalesData);
     setPeriodos(periodosData);
-    const actualId = obtenerPeriodoPredeterminado(periodosData);
+    const periodoGuardado = localStorage.getItem(
+  `dashboard-periodo-${id}`
+);
+
+const actualId =
+  periodoGuardado &&
+  periodosData.some(
+    (periodo) => periodo.id === periodoGuardado
+  )
+    ? periodoGuardado
+    : obtenerPeriodoPredeterminado(periodosData);
     setPeriodoId(actualId);
     setPeriodoDesdeId(actualId);
     setPeriodoHastaId(actualId);

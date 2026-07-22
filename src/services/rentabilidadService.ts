@@ -353,6 +353,7 @@ function construirFilas(input: {
   canal: "Paradise" | "PedidosYa";
   empresa_id: string;
   periodo_id: string;
+  sucursal_id?: string | null;
   contexto: ContextoCostos;
   vinculaciones: Map<string, string>;
 
@@ -466,6 +467,7 @@ function construirFilas(input: {
     return {
       empresa_id: input.empresa_id,
       periodo_id: input.periodo_id,
+      sucursal_id: input.sucursal_id || null,
 
       nombre_producto:
         producto.nombre_producto,
@@ -773,6 +775,7 @@ if (deleteError) throw deleteError;
     canal: "Paradise",
     empresa_id: input.empresa_id,
     periodo_id: input.periodo_id,
+    sucursal_id: input.sucursal_id || null,
     contexto,
     vinculaciones: contexto.vinculacionesParadise,
     contadores,
@@ -783,6 +786,7 @@ if (deleteError) throw deleteError;
   canal: "PedidosYa",
   empresa_id: input.empresa_id,
   periodo_id: input.periodo_id,
+  sucursal_id: input.sucursal_id || null,
   contexto,
   vinculaciones:
     contexto.vinculacionesPedidosYa,

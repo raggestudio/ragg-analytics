@@ -234,8 +234,73 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
     .slice(inicio, fin + 1)
     .map((periodo) => periodo.id);
 }
-  async function cargarDashboard() {
+  async function cargarDashboard(
+  forzarActualizacion = false
+) {
+  const claveCache = [
+    "dashboard-cache",
+    empresaId,
+    periodoId,
+    sucursalId || "todas",
+    modoAnalisis,
+    periodoDesdeId || "-",
+    periodoHastaId || "-",
+  ].join(":");
+
+  if (!forzarActualizacion) {
     try {
+      const cacheTexto =
+        sessionStorage.getItem(claveCache);
+
+      if (cacheTexto) {
+        const cache = JSON.parse(cacheTexto);
+
+        /*
+         * La información se reutiliza durante 30 minutos.
+         */
+        const cacheVigente =
+          Date.now() - Number(cache.guardadoEn || 0) <
+          30 * 60 * 1000;
+
+        if (cacheVigente) {
+          setComparativo(cache.comparativo);
+          setTopRentabilidad(
+            cache.topRentabilidad || []
+          );
+          setTopFacturacion(
+            cache.topFacturacion || []
+          );
+          setEvolucion(cache.evolucion || []);
+          setTopPedidosYa(
+            cache.topPedidosYa || []
+          );
+          setSaboresPedidosYa(
+            cache.saboresPedidosYa || []
+          );
+          setCostosSaboresPedidosYa(
+            cache.costosSaboresPedidosYa || null
+          );
+          setInsights(
+            cache.insights || {
+              positivas: [],
+              atencion: [],
+              acciones: [],
+            }
+          );
+
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "No se pudo recuperar el dashboard guardado",
+        error
+      );
+    }
+  }
+
+  try {
+ 
       setMensaje("");
 
       const input = {
@@ -278,11 +343,30 @@ setCostosSaboresPedidosYa(costosSabores);
       setTopFacturacion(topFacturacionData);
       setEvolucion(evolucionData);
       setTopPedidosYa(topPedidosYaData);
-      setInsights(
-      generarInsights(
-    comparativoData.actual,
-    comparativoData.anterior
-  )
+      const insightsCalculados = generarInsights(
+  comparativoData.actual,
+  comparativoData.anterior
+);
+
+setInsights(insightsCalculados);
+
+sessionStorage.setItem(
+  claveCache,
+  JSON.stringify({
+    guardadoEn: Date.now(),
+    comparativo: comparativoData,
+    topRentabilidad:
+      topRentabilidadData,
+    topFacturacion:
+      topFacturacionData,
+    evolucion: evolucionData,
+    topPedidosYa:
+      topPedidosYaData,
+    saboresPedidosYa: sabores,
+    costosSaboresPedidosYa:
+      costosSabores,
+    insights: insightsCalculados,
+  })
 );
     } catch (error: any) {
       console.error(error);
@@ -402,6 +486,13 @@ function textoComparacion() {
   >
     Exportar PDF
   </button>
+  <button
+  type="button"
+  style={pdfButton}
+  onClick={() => cargarDashboard(true)}
+>
+  Actualizar datos
+</button>
 </div>
 
       <section style={card}>

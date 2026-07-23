@@ -46,7 +46,12 @@ export function DashboardPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
-  const [empresaId, setEmpresaId] = useState("");
+  const [empresaId, setEmpresaId] = useState(
+  () =>
+    localStorage.getItem(
+      "dashboard-empresa-seleccionada"
+    ) || ""
+);
   const [sucursalId, setSucursalId] = useState("");
   const [periodoId, setPeriodoId] = useState("");
   const [periodoDesdeId, setPeriodoDesdeId] = useState("");
@@ -118,16 +123,24 @@ useEffect(() => {
     modoAnalisis
   );
 }, [modoAnalisis]);
+useEffect(() => {
+  if (!empresaId) return;
 
+  localStorage.setItem(
+    "dashboard-empresa-seleccionada",
+    empresaId
+  );
+}, [empresaId]);
   async function cargarInicial() {
     const empresasData = await obtenerEmpresas();
     setEmpresas(empresasData);
 
     if (empresasData.length > 0) {
   const empresaGuardadaId =
-    localStorage.getItem(
-      "dashboard-empresa-seleccionada"
-    );
+  empresaId ||
+  localStorage.getItem(
+    "dashboard-empresa-seleccionada"
+  );
 
   const empresa =
     empresasData.find(

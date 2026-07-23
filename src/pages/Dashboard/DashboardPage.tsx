@@ -124,8 +124,18 @@ useEffect(() => {
     setEmpresas(empresasData);
 
     if (empresasData.length > 0) {
-      const empresa = empresasData[0];
-      setEmpresaId(empresa.id);
+  const empresaGuardadaId =
+    localStorage.getItem(
+      "dashboard-empresa-seleccionada"
+    );
+
+  const empresa =
+    empresasData.find(
+      (item) =>
+        item.id === empresaGuardadaId
+    ) || empresasData[0];
+
+  setEmpresaId(empresa.id);
 
       const sucursalesData = await obtenerSucursalesPorEmpresa(empresa.id);
       const periodosData = await obtenerPeriodosPorEmpresa(empresa.id);
@@ -151,6 +161,10 @@ const actualId =
   }
 
   async function cambiarEmpresa(id: string) {
+    localStorage.setItem(
+  "dashboard-empresa-seleccionada",
+  id
+);
     setEmpresaId(id);
     setSucursalId("");
 

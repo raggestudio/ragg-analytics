@@ -40,72 +40,87 @@ export function RentabilidadSaboresPedidosYa({ resumen }: Props) {
   if (!resumen || resumen.sabores.length === 0) return null;
 
   return (
-    <section style={card}>
-      <h3>💰 Costos estimados de sabores (PedidosYa)</h3>
+    <>
+      <section style={card}>
+        <h3>💰 Resumen de costos de sabores (PedidosYa)</h3>
 
-      <div style={metricas}>
-        <div style={tarjeta}>
-          <strong>Costo promedio</strong>
-          <span>
-            ${resumen.costo_promedio_kg.toFixed(0)}/kg
-          </span>
+        <div style={metricas}>
+          <div style={tarjeta}>
+            <strong>Costo promedio</strong>
+            <span>
+              ${resumen.costo_promedio_kg.toFixed(0)}/kg
+            </span>
+          </div>
+
+          <div style={tarjeta}>
+            <strong>Más barato</strong>
+            <span>
+              {resumen.sabor_mas_barato?.sabor ?? "-"}
+            </span>
+          </div>
+
+          <div style={tarjeta}>
+            <strong>Más caro</strong>
+            <span>
+              {resumen.sabor_mas_caro?.sabor ?? "-"}
+            </span>
+          </div>
+
+          <div style={tarjeta}>
+            <strong>Vinculados</strong>
+            <span>
+              {resumen.sabores_vinculados} / {resumen.sabores_totales}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section
+        style={card}
+        className="print-costos-anexo"
+      >
+        <div className="print-anexo-heading">
+          <h2>Anexo detallado</h2>
+          <p>Costos por sabor de PedidosYa</p>
         </div>
 
-        <div style={tarjeta}>
-          <strong>Más barato</strong>
-          <span>
-            {resumen.sabor_mas_barato?.sabor ?? "-"}
-          </span>
+        <h3>Detalle completo de costos por sabor</h3>
+
+        <div style={header}>
+          <strong>Sabor</strong>
+          <strong>Selecciones</strong>
+          <strong>Costo/kg</strong>
+          <strong>Nivel</strong>
         </div>
 
-        <div style={tarjeta}>
-          <strong>Más caro</strong>
-          <span>
-            {resumen.sabor_mas_caro?.sabor ?? "-"}
-          </span>
-        </div>
-
-        <div style={tarjeta}>
-          <strong>Vinculados</strong>
-          <span>
-            {resumen.sabores_vinculados} / {resumen.sabores_totales}
-          </span>
-        </div>
-      </div>
-
-      <div style={header}>
-        <strong>Sabor</strong>
-        <strong>Selecciones</strong>
-        <strong>Costo/kg</strong>
-        <strong>Nivel</strong>
-      </div>
-
-      {resumen.sabores.map((item) => (
-        <div
-          key={item.sabor_normalizado}
-          style={fila}
-        >
-          <span>{item.sabor}</span>
-
-          <span>{item.selecciones}</span>
-
-          <span>
-            {item.costo_kg === null
-              ? "-"
-              : `$${item.costo_kg.toFixed(0)}`}
-          </span>
-
-          <span
-            style={{
-              color: colorNivel(item.nivel),
-              fontWeight: 700,
-            }}
+        {resumen.sabores.map((item) => (
+          <div
+            key={item.sabor_normalizado}
+            style={fila}
+            className="print-table-row"
           >
-            {textoNivel(item.nivel)}
-          </span>
-        </div>
-      ))}
-    </section>
+            <span>{item.sabor}</span>
+
+            <span>{item.selecciones}</span>
+
+            <span>
+              {item.costo_kg === null
+                ? "-"
+                : `$${item.costo_kg.toFixed(0)}`}
+            </span>
+
+            <span
+              style={{
+                color: colorNivel(item.nivel),
+                fontWeight: 700,
+              }}
+            >
+              {textoNivel(item.nivel)}
+            </span>
+          </div>
+        ))}
+      </section>
+    </>
   );
 }
 

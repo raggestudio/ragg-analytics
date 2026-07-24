@@ -151,6 +151,10 @@ code {
   display: none;
 }
 
+.print-anexo-heading {
+  display: none;
+}
+
 @media print {
 
   .no-print {
@@ -163,6 +167,26 @@ code {
     align-items: flex-start;
     margin-bottom: 24px;
     gap: 40px;
+  }
+
+  .print-table-row {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-costos-anexo {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-anexo-heading {
+    display: block !important;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .print-anexo-heading h2 {
+    margin-bottom: 6px;
   }
 
 .no-print {

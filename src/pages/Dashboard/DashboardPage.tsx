@@ -839,7 +839,7 @@ function textoComparacion() {
                 )}
               />
 
-              <Metric title="Productos vendidos" value={resumen.productos_vendidos} />
+              <Metric title="Productos analizados" value={resumen.productos_vendidos} />
 
               <Metric
                 title="Productos sin revisar"
@@ -1037,7 +1037,11 @@ function textoComparacion() {
                   <strong>Ganancia</strong>
                 </div>
                 {topPedidosYa.map((item, index) => (
-                  <div key={item.nombre} style={pyTableRow}>
+                  <div
+                    key={item.nombre}
+                    style={pyTableRow}
+                    className="print-table-row"
+                  >
                     <span>{index + 1}. {item.nombre}</span>
                     <span>{item.cantidad.toLocaleString("es-UY")}</span>
                     <span>{moneda(item.ventas)}</span>
@@ -1198,6 +1202,7 @@ function textoComparacion() {
               <div
                 key={producto.nombre}
                 style={pyTableRow}
+                className="print-table-row"
               >
                 <span>
                   {index + 1}. {producto.nombre}
@@ -1267,7 +1272,11 @@ function textoComparacion() {
           <strong>Ganancia</strong>
         </div>
         {topParadise.map((item, index) => (
-          <div key={item.nombre} style={pyTableRow}>
+          <div
+            key={item.nombre}
+            style={pyTableRow}
+            className="print-table-row"
+          >
             <span>
               {index + 1}. {item.nombre}
             </span>
@@ -1335,7 +1344,11 @@ function textoComparacion() {
           <strong>Ganancia</strong>
         </div>
         {topIsatechLocal.map((item, index) => (
-          <div key={item.nombre} style={pyTableRow}>
+          <div
+            key={item.nombre}
+            style={pyTableRow}
+            className="print-table-row"
+          >
             <span>
               {index + 1}. {item.nombre}
             </span>
@@ -1387,7 +1400,13 @@ function textoComparacion() {
           </section>
 
           {!resumen.es_restaurante && <section style={card}>
-            <h3>Producción</h3>
+            <h3>Producción total de PIÚ</h3>
+
+            <p style={hint}>
+              Estos datos corresponden a la producción total
+              de la empresa y no cambian al seleccionar una
+              sucursal.
+            </p>
 
             <div style={metricGrid}>
               <Metric

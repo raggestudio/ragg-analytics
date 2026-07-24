@@ -538,6 +538,23 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
         porTurno[turno].pedidos;
     }
 
+    /*
+     * Cuando existe orderDetails, la facturación comparable con
+     * el resumen general es la venta efectiva: venta bruta menos
+     * el descuento financiado por Duna. Si todavía falta ese
+     * archivo, conservamos provisoriamente la venta bruta del
+     * resumen de productos.
+     */
+    if (porTurno[turno].detalle_disponible) {
+      porTurno[turno].facturacion =
+        porTurno[turno].venta_efectiva;
+      porTurno[turno].ticket_promedio =
+        porTurno[turno].pedidos > 0
+          ? porTurno[turno].facturacion /
+            porTurno[turno].pedidos
+          : 0;
+    }
+
     porTurno[turno].productos_sin_costo =
       sinCostoPorTurno[turno].size;
     const ventasBrutasProductos = Array.from(

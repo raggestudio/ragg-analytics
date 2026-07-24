@@ -31,6 +31,10 @@ retencion_recuperable_pedidosya: number;
 descuento_local_pedidosya: number;
 ventas_brutas_pedidosya: number;
   ventas_paradise: number;
+  unidades_paradise: number;
+  costo_productos_paradise: number;
+  margen_paradise: number;
+  margen_porcentaje_paradise: number;
   es_restaurante: boolean;
   costo_productos_pedidosya: number;
   margen_pedidosya: number;
@@ -373,6 +377,14 @@ const costosCanal =
       0
     );
 
+  const unidadesParadise = (rentabilidad || [])
+    .filter((item: any) => item.canal === "Paradise")
+    .reduce(
+      (total: number, item: any) =>
+        total + Number(item.cantidad || 0),
+      0
+    );
+
   const ventasTotalesAjustadas =
     esRestaurante
       ? ventasParadise + ventasPedidosYaConTurnos
@@ -573,6 +585,13 @@ ventas_brutas_pedidosya:
   ventasBrutasPedidosYaConTurnos,
 
 ventas_paradise: ventasParadise,
+unidades_paradise: unidadesParadise,
+costo_productos_paradise: costoParadise,
+margen_paradise: margenParadise,
+margen_porcentaje_paradise:
+  ventasParadise > 0
+    ? (margenParadise / ventasParadise) * 100
+    : 0,
 
 es_restaurante: esRestaurante,
 
@@ -769,6 +788,40 @@ ventas_brutas_pedidosya:
     ventas_paradise: resumenes.reduce(
       (total, item) => total + Number(item.ventas_paradise || 0), 0
     ),
+    unidades_paradise: resumenes.reduce(
+      (total, item) =>
+        total + Number(item.unidades_paradise || 0),
+      0
+    ),
+    costo_productos_paradise: resumenes.reduce(
+      (total, item) =>
+        total +
+        Number(item.costo_productos_paradise || 0),
+      0
+    ),
+    margen_paradise: resumenes.reduce(
+      (total, item) =>
+        total + Number(item.margen_paradise || 0),
+      0
+    ),
+    margen_porcentaje_paradise:
+      resumenes.reduce(
+        (total, item) =>
+          total + Number(item.ventas_paradise || 0),
+        0
+      ) > 0
+        ? (resumenes.reduce(
+            (total, item) =>
+              total + Number(item.margen_paradise || 0),
+            0
+          ) /
+            resumenes.reduce(
+              (total, item) =>
+                total + Number(item.ventas_paradise || 0),
+              0
+            )) *
+          100
+        : 0,
     es_restaurante: resumenes.some((item) => item.es_restaurante),
     costo_productos_pedidosya: resumenes.reduce(
       (total, item) => total + Number(item.costo_productos_pedidosya || 0), 0
@@ -1324,4 +1377,50 @@ export async function obtenerEvolucionDashboard(input: {
       margen: valores.margen,
     };
   });
+}
+
+export async function obtenerTopParadise(input: {
+  empresa_id: string;
+  periodo_id: string;
+  sucursal_id?: string | null;
+  modo?: "mensual" | "trimestral" | "anual" | "personalizado";
+  periodo_desde_id?: string | null;
+  periodo_hasta_id?: string | null;
+}): Promise<RankingCanalItem[]> {
+  const periodoIds = await obtenerIdsPeriodosParaModo(input);
+  if (periodoIds.length === 0) return [];
+
+  let query = supabase
+    .from("rentabilidad_periodo")
+    .select("nombre_producto, cantidad, ventas, margen")
+    .eq("empresa_id", input.empresa_id)
+    .eq("canal", "Paradise")
+    .in("periodo_id", periodoIds);
+
+  if (input.sucursal_id) {
+    query = query.eq("sucursal_id", input.sucursal_id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const agrupados = new Map<string, RankingCanalItem>();
+
+  for (const fila of data || []) {
+    const actual = agrupados.get(fila.nombre_producto) || {
+      nombre: fila.nombre_producto,
+      cantidad: 0,
+      ventas: 0,
+      margen: 0,
+    };
+
+    actual.cantidad += Number(fila.cantidad || 0);
+    actual.ventas += Number(fila.ventas || 0);
+    actual.margen += Number(fila.margen || 0);
+    agrupados.set(fila.nombre_producto, actual);
+  }
+
+  return Array.from(agrupados.values())
+    .sort((a, b) => b.ventas - a.ventas)
+    .slice(0, 5);
 }

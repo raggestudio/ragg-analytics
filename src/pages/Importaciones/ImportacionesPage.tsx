@@ -41,6 +41,12 @@ import {
 import {
   reemplazarOrderDetailsPedidosYa,
 } from "../../services/pedidosYaOrderDetailsService";
+import {
+  leerCsvSaboresPedidosYa,
+} from "../../services/pedidosYaSaboresParser";
+import {
+  reemplazarResumenSaboresPedidosYa,
+} from "../../services/pedidosYaSaboresService";
 import type { Empresa } from "../../types/empresa";
 import type { Sucursal } from "../../types/sucursal";
 import type { Periodo } from "../../types/periodo";
@@ -48,6 +54,7 @@ import type { Importacion } from "../../types/importacion";
 
 type TipoImportacion =
   | "pedidosya_csv"
+  | "pedidosya_sabores_csv"
   | "pedidosya_csv_noche"
   | "pedidosya_productos_excel"
   | "pedidosya_order_details_csv"
@@ -64,6 +71,10 @@ type OpcionImportacion = {
 };
 
 const OPCIONES_HELADERIA: OpcionImportacion[] = [
+  {
+    value: "pedidosya_sabores_csv",
+    label: "PedidosYa detalle de sabores CSV",
+  },
   {
     value: "pedidosya_csv",
     label: "PedidosYa resumen diario CSV",
@@ -123,7 +134,12 @@ export function ImportacionesPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
-  const [empresaId, setEmpresaId] = useState("");
+  const [empresaId, setEmpresaId] = useState(
+    () =>
+      localStorage.getItem(
+        "importaciones-empresa-seleccionada"
+      ) || ""
+  );
   const [sucursalId, setSucursalId] = useState("");
   const [periodoId, setPeriodoId] = useState("");
   const [tipoImportacion, setTipoImportacion] =
@@ -141,6 +157,15 @@ export function ImportacionesPage() {
   }, []);
 
   useEffect(() => {
+    if (!empresaId) return;
+
+    localStorage.setItem(
+      "importaciones-empresa-seleccionada",
+      empresaId
+    );
+  }, [empresaId]);
+
+  useEffect(() => {
     if (empresaId && periodoId && sucursalId) {
       cargarRentabilidad();
     }
@@ -151,13 +176,28 @@ export function ImportacionesPage() {
     setEmpresas(data);
 
     if (data.length > 0) {
-      setEmpresaId(data[0].id);
+      const empresaGuardadaId =
+        empresaId ||
+        localStorage.getItem(
+          "importaciones-empresa-seleccionada"
+        );
+
+      const empresaSeleccionada =
+        data.find(
+          (empresa) =>
+            empresa.id === empresaGuardadaId
+        ) || data[0];
+
+      setEmpresaId(empresaSeleccionada.id);
       setTipoImportacion(
-        data[0].tipo_negocio === "restaurante"
+        empresaSeleccionada.tipo_negocio ===
+          "restaurante"
           ? "pedidosya_csv"
           : "pedidosya_csv"
       );
-      await cargarDatosEmpresa(data[0].id);
+      await cargarDatosEmpresa(
+        empresaSeleccionada.id
+      );
     }
   }
 
@@ -399,6 +439,36 @@ export function ImportacionesPage() {
                 ? "mediodía"
                 : ""
           } importado: ${ventas.length} filas.`
+        );
+      }
+
+      if (tipoImportacion === "pedidosya_sabores_csv") {
+        const resultado = await leerCsvSaboresPedidosYa(
+          archivo,
+          {
+            anio: periodo.anio,
+            mes: periodo.mes,
+          }
+        );
+
+        await reemplazarResumenSaboresPedidosYa({
+          empresa_id: empresaId,
+          sucursal_id: sucursalId,
+          periodo_id: periodo.id,
+          periodo_anio: periodo.anio,
+          periodo_mes: periodo.mes,
+          sabores: resultado.sabores,
+        });
+
+        await registrarImportacion({
+          archivo,
+          registros: resultado.sabores.length,
+        });
+
+        setMensaje(
+          `Detalle de sabores PedidosYa importado: ` +
+            `${resultado.sabores.length} sabores y ` +
+            `${resultado.selecciones_totales} selecciones.`
         );
       }
 
@@ -791,6 +861,11 @@ export function ImportacionesPage() {
             <EstadoItem
               label="PedidosYa resumen diario"
               tipo="pedidosya_csv"
+              usaSucursal
+            />
+            <EstadoItem
+              label="PedidosYa detalle de sabores"
+              tipo="pedidosya_sabores_csv"
               usaSucursal
             />
             <EstadoItem

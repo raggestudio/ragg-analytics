@@ -31,6 +31,11 @@ import { generarInsights } from "../../services/dashboardInsights";
 import type { Empresa } from "../../types/empresa";
 import type { Sucursal } from "../../types/sucursal";
 import type { Periodo } from "../../types/periodo";
+import {
+  obtenerResumenPedidosYaPorTurno,
+  type ResumenPedidosYaPorTurno,
+  type VistaTurnoPedidosYa,
+} from "../../services/pedidosYaTurnoService";
 
 function obtenerPeriodoPredeterminado(periodos: Periodo[]) {
   const hoy = new Date();
@@ -62,6 +67,10 @@ export function DashboardPage() {
   const [mensaje, setMensaje] = useState("");
   const [evolucion, setEvolucion] = useState<EvolucionDashboardItem[]>([]);
   const [topPedidosYa, setTopPedidosYa] = useState<RankingCanalItem[]>([]);
+  const [resumenTurnos, setResumenTurnos] =
+    useState<ResumenPedidosYaPorTurno | null>(null);
+  const [vistaTurno, setVistaTurno] =
+    useState<VistaTurnoPedidosYa>("total");
   const [insights, setInsights] = useState({
   positivas: [] as string[],
   atencion: [] as string[],
@@ -307,6 +316,9 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
           setCostosSaboresPedidosYa(
             cache.costosSaboresPedidosYa || null
           );
+          setResumenTurnos(
+            cache.resumenTurnos || null
+          );
           setInsights(
             cache.insights || {
               positivas: [],
@@ -346,7 +358,20 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
       const topFacturacionData = await obtenerTopFacturacion(input);
       const evolucionData = await obtenerEvolucionDashboard(input);
       const topPedidosYaData = await obtenerTopPedidosYa(input);
-      const periodoIdsSabores = obtenerPeriodoIdsSeleccionados();
+const periodoIdsSabores = obtenerPeriodoIdsSeleccionados();
+
+const empresaSeleccionada = empresas.find(
+  (empresa) => empresa.id === empresaId
+);
+
+const resumenTurnosData =
+  empresaSeleccionada?.tipo_negocio === "restaurante"
+    ? await obtenerResumenPedidosYaPorTurno({
+        empresa_id: empresaId,
+        periodo_ids: periodoIdsSabores,
+        sucursal_id: sucursalId || null,
+      })
+    : null;
 
 const filasSabores = await obtenerSaboresPedidosYaPorPeriodos({
   empresa_id: empresaId,
@@ -364,6 +389,7 @@ const costosSabores = await obtenerCostosSaboresPedidosYa({
 
 setSaboresPedidosYa(sabores);
 setCostosSaboresPedidosYa(costosSabores);
+setResumenTurnos(resumenTurnosData);
 
       setComparativo(comparativoData);
       setTopRentabilidad(topRentabilidadData);
@@ -392,6 +418,7 @@ sessionStorage.setItem(
     saboresPedidosYa: sabores,
     costosSaboresPedidosYa:
       costosSabores,
+    resumenTurnos: resumenTurnosData,
     insights: insightsCalculados,
   })
 );
@@ -500,6 +527,8 @@ function textoComparacion() {
   const sucursalActual = sucursales.find((s) => s.id === sucursalId);
   const resumen = comparativo?.actual || null;
   const anterior = comparativo?.anterior || null;
+  const resumenTurnoActual =
+    resumenTurnos?.[vistaTurno] || null;
 
   return (
     <div>
@@ -958,6 +987,168 @@ function textoComparacion() {
               </div>
             )}
           </section>
+
+{resumen.es_restaurante &&
+  resumenTurnos &&
+  resumenTurnoActual && (
+    <section style={card}>
+      <h3>Análisis de PedidosYa por turno</h3>
+
+      <div
+        className="no-print"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginBottom: 20,
+        }}
+      >
+        <select
+          style={{ ...input, maxWidth: 320 }}
+          value={vistaTurno}
+          onChange={(event) =>
+            setVistaTurno(
+              event.target.value as VistaTurnoPedidosYa
+            )
+          }
+        >
+          <option value="total">Total PedidosYa</option>
+          <option value="mediodia">Mediodía</option>
+          <option value="noche">Noche</option>
+        </select>
+      </div>
+
+      <div style={metricGrid}>
+        <Metric
+          title="Facturación"
+          value={moneda(
+            resumenTurnoActual.facturacion
+          )}
+        />
+        <Metric
+          title="Pedidos"
+          value={resumenTurnoActual.pedidos}
+        />
+        <Metric
+          title="Ticket promedio"
+          value={moneda(
+            resumenTurnoActual.ticket_promedio
+          )}
+        />
+
+        {resumenTurnoActual.detalle_disponible && (
+          <>
+            <Metric
+              title="Venta bruta"
+              value={moneda(
+                resumenTurnoActual.ventas_brutas
+              )}
+            />
+            <Metric
+              title="Descuento de Duna"
+              value={moneda(
+                resumenTurnoActual.descuento_local
+              )}
+            />
+            <Metric
+              title="Venta efectiva"
+              value={moneda(
+                resumenTurnoActual.venta_efectiva
+              )}
+            />
+            <Metric
+              title="Comisión 23% + IVA"
+              value={moneda(
+                resumenTurnoActual.comision +
+                  resumenTurnoActual.iva_comision
+              )}
+            />
+            <Metric
+              title="Tarifa de pago en línea"
+              value={moneda(
+                resumenTurnoActual.tarifa_pago_linea
+              )}
+            />
+            <Metric
+              title="Retención recuperable"
+              value={moneda(
+                resumenTurnoActual.retencion_recuperable
+              )}
+            />
+            <Metric
+              title="Ingreso estimado"
+              value={moneda(
+                resumenTurnoActual.ingreso_estimado
+              )}
+            />
+            <Metric
+              title="Costo de productos"
+              value={moneda(
+                resumenTurnoActual.costo_productos
+              )}
+            />
+            <Metric
+              title="Ganancia neta"
+              value={moneda(
+                resumenTurnoActual.ganancia_neta
+              )}
+            />
+            <Metric
+              title="Margen neto"
+              value={porcentaje(
+                resumenTurnoActual.margen_porcentaje
+              )}
+            />
+            <Metric
+              title="Productos sin costo"
+              value={
+                resumenTurnoActual.productos_sin_costo
+              }
+            />
+          </>
+        )}
+      </div>
+
+      {!resumenTurnoActual.detalle_disponible && (
+        <p style={hint}>
+          Ya se puede analizar la facturación, los
+          pedidos y el ticket de este turno. El detalle
+          de descuentos, comisión, tarifa e ingreso se
+          completará al importar su archivo orderDetails.
+        </p>
+      )}
+
+      {resumenTurnoActual.top_productos.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h4>
+            Top 5 productos por unidades ·{" "}
+            {vistaTurno === "total"
+              ? "Total"
+              : vistaTurno === "mediodia"
+                ? "Mediodía"
+                : "Noche"}
+          </h4>
+          {resumenTurnoActual.top_productos.map(
+            (producto, index) => (
+              <div
+                key={producto.nombre}
+                style={pyTableRow}
+              >
+                <span>
+                  {index + 1}. {producto.nombre}
+                </span>
+                <span>
+                  {producto.unidades.toLocaleString(
+                    "es-UY"
+                  )}{" "}
+                  unidades
+                </span>
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </section>
+  )}
 
 {!resumen.es_restaurante && (
   <>

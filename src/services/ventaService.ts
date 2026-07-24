@@ -15,6 +15,7 @@ export type Venta = {
   delivery: number;
   pickup: number;
   total: number;
+  turno?: "general" | "mediodia" | "noche";
 };
 
 export async function reemplazarVentasPedidosYa(
@@ -30,7 +31,8 @@ export async function reemplazarVentasPedidosYa(
     ventas: number;
     delivery: number;
     pickup: number;
-  }[]
+  }[],
+  turno: "general" | "mediodia" | "noche" = "general"
 ) {
   if (ventas.length === 0) return;
 
@@ -41,7 +43,8 @@ export async function reemplazarVentasPedidosYa(
     .from("ventas")
     .delete()
     .eq("empresa_id", empresaId)
-    .eq("origen", "PedidosYa");
+    .eq("origen", "PedidosYa")
+    .eq("turno", turno);
 
   if (sucursalId) {
     deleteQuery = deleteQuery.eq("sucursal_id", sucursalId);
@@ -70,6 +73,7 @@ export async function reemplazarVentasPedidosYa(
       pickup: v.pickup,
       total: v.ventas,
       estado: "importado",
+      turno,
     }))
   );
 

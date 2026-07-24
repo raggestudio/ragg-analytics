@@ -9,6 +9,7 @@ export async function crearImportacion(input: {
   periodo_mes?: number | null;
   archivo_nombre: string;
   tipo: string;
+  turno?: "general" | "mediodia" | "noche";
   registros_importados?: number;
   errores?: number;
 }) {
@@ -24,6 +25,7 @@ export async function crearImportacion(input: {
       periodo_mes: input.periodo_mes || null,
       archivo_nombre: input.archivo_nombre,
       tipo: input.tipo,
+      turno: input.turno || "general",
       estado: "importado",
       registros_importados: input.registros_importados || 0,
       errores: input.errores || 0,

@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { obtenerResumenPedidosYaPorTurno } from "./pedidosYaTurnoService";
 
 export type DashboardResumen = {
   ventas_totales: number;
@@ -216,6 +217,13 @@ export async function obtenerDashboardResumen(input: {
   const esRestaurante = (fuentes || []).some(
     (item: any) => item.fuente === "Paradise"
   );
+  const resumenPedidosYaTurnos = esRestaurante
+    ? await obtenerResumenPedidosYaPorTurno({
+        empresa_id: input.empresa_id,
+        periodo_ids: [input.periodo_id],
+        sucursal_id: input.sucursal_id || null,
+      })
+    : null;
   const ventasPedidosYaRentabilidad = (rentabilidad || [])
     .filter((item: any) => item.canal === "PedidosYa")
     .reduce((acc: number, item: any) => acc + Number(item.ventas || 0), 0);
@@ -289,6 +297,66 @@ const costosCanal =
     (acc: number, item: any) => acc + Number(item.margen || 0), 0
   );
 
+  const detalleTurnosCompleto = Boolean(
+    resumenPedidosYaTurnos?.total.detalle_disponible
+  );
+
+  const ventasPedidosYaConTurnos =
+    detalleTurnosCompleto
+      ? Number(
+          resumenPedidosYaTurnos?.total
+            .venta_efectiva || 0
+        )
+      : ventasPedidosYaRentabilidad;
+
+  const costoProductosPedidosYaConTurnos =
+    detalleTurnosCompleto
+      ? Number(
+          resumenPedidosYaTurnos?.total
+            .costo_productos || 0
+        )
+      : costoProductosPedidosYa;
+
+  const margenPedidosYaConTurnos =
+    detalleTurnosCompleto
+      ? Number(
+          resumenPedidosYaTurnos?.total
+            .ganancia_neta || 0
+        )
+      : margenPedidosYa;
+
+  const costoParadise = (rentabilidad || [])
+    .filter((item: any) => item.canal === "Paradise")
+    .reduce(
+      (total: number, item: any) =>
+        total + Number(item.costo_total || 0),
+      0
+    );
+
+  const margenParadise = (rentabilidad || [])
+    .filter((item: any) => item.canal === "Paradise")
+    .reduce(
+      (total: number, item: any) =>
+        total + Number(item.margen || 0),
+      0
+    );
+
+  const ventasTotalesAjustadas =
+    esRestaurante && detalleTurnosCompleto
+      ? ventasParadise + ventasPedidosYaConTurnos
+      : ventasTotales;
+
+  const costoTotalAjustado =
+    esRestaurante && detalleTurnosCompleto
+      ? costoParadise +
+        costoProductosPedidosYaConTurnos
+      : costoTotal;
+
+  const margenTotalAjustado =
+    esRestaurante && detalleTurnosCompleto
+      ? margenParadise + margenPedidosYaConTurnos
+      : margenTotal;
+
   const pedidosPedidosYaOriginal = (ventasPy || []).reduce(
     (acc, item: any) => acc + Number(item.pedidos || 0),
     0
@@ -299,10 +367,13 @@ const costosCanal =
     0
   );
   const pedidosPedidosYa = esRestaurante
-    ? pedidosDetalleContabilizables.length
+    ? Number(
+        resumenPedidosYaTurnos?.total.pedidos ||
+          pedidosDetalleContabilizables.length
+      )
     : pedidosPedidosYaOriginal;
   const ventasPedidosYa = esRestaurante
-    ? ventasPedidosYaRentabilidad
+    ? ventasPedidosYaConTurnos
     : ventasPedidosYaOriginal;
 
   const deliveryPedidosYa = (ventasPy || []).reduce(
@@ -365,13 +436,21 @@ const costosCanal =
     (r: any) => r.tipo_calculo === "sin_costo"
   ).length;
 
-  const ventasDirectas = Math.max(ventasTotales - ventasPedidosYa, 0);
+  const ventasDirectas = Math.max(
+    ventasTotalesAjustadas - ventasPedidosYa,
+    0
+  );
 
   return {
-    ventas_totales: ventasTotales,
-    costo_total: costoTotal,
-    margen_total: margenTotal,
-    margen_porcentaje: ventasTotales > 0 ? (margenTotal / ventasTotales) * 100 : 0,
+    ventas_totales: ventasTotalesAjustadas,
+    costo_total: costoTotalAjustado,
+    margen_total: margenTotalAjustado,
+    margen_porcentaje:
+      ventasTotalesAjustadas > 0
+        ? (margenTotalAjustado /
+            ventasTotalesAjustadas) *
+          100
+        : 0,
     productos_vendidos: rentabilidad?.length || 0,
 
     pedidos_pedidosya: pedidosPedidosYa,
@@ -380,52 +459,107 @@ const costosCanal =
     delivery_pedidosya: deliveryPedidosYa,
     pickup_pedidosya: pickupPedidosYa,
     participacion_pedidosya:
-      ventasTotales > 0 ? (ventasPedidosYa / ventasTotales) * 100 : 0,
+      ventasTotalesAjustadas > 0
+        ? (ventasPedidosYa /
+            ventasTotalesAjustadas) *
+          100
+        : 0,
     ventas_directas: ventasDirectas,
     participacion_directas:
-      ventasTotales > 0 ? (ventasDirectas / ventasTotales) * 100 : 0,
+      ventasTotalesAjustadas > 0
+        ? (ventasDirectas /
+            ventasTotalesAjustadas) *
+          100
+        : 0,
 
     kilos_producidos: kilosProducidos,
     costo_promedio_kg: costoPromedioKg,
     sabores_producidos: saboresProducidos,
 
     productos_sin_revisar: productosSinRevisar,
-    costos_canal: costosCanal,
+    costos_canal: detalleTurnosCompleto
+      ? Number(
+          (resumenPedidosYaTurnos?.total.comision ||
+            0) +
+            (resumenPedidosYaTurnos?.total
+              .iva_comision || 0) +
+            (resumenPedidosYaTurnos?.total
+              .tarifa_pago_linea || 0)
+        )
+      : costosCanal,
 
 comision_pedidosya:
-  comisionPedidosYa,
+  detalleTurnosCompleto
+    ? Number(
+        resumenPedidosYaTurnos?.total.comision || 0
+      )
+    : comisionPedidosYa,
 
 iva_comision_pedidosya:
-  ivaComisionPedidosYa,
+  detalleTurnosCompleto
+    ? Number(
+        resumenPedidosYaTurnos?.total
+          .iva_comision || 0
+      )
+    : ivaComisionPedidosYa,
 
 comision_mas_iva_pedidosya:
-  comisionMasIvaPedidosYa,
+  detalleTurnosCompleto
+    ? Number(
+        (resumenPedidosYaTurnos?.total.comision ||
+          0) +
+          (resumenPedidosYaTurnos?.total
+            .iva_comision || 0)
+      )
+    : comisionMasIvaPedidosYa,
 
 tarifa_pago_linea_pedidosya:
-  tarifaPagoLineaPedidosYa,
+  detalleTurnosCompleto
+    ? Number(
+        resumenPedidosYaTurnos?.total
+          .tarifa_pago_linea || 0
+      )
+    : tarifaPagoLineaPedidosYa,
 
 retencion_recuperable_pedidosya:
-  retencionRecuperablePedidosYa,
+  detalleTurnosCompleto
+    ? Number(
+        resumenPedidosYaTurnos?.total
+          .retencion_recuperable || 0
+      )
+    : retencionRecuperablePedidosYa,
 
 descuento_local_pedidosya:
-  descuentoLocalPedidosYa,
+  detalleTurnosCompleto
+    ? Number(
+        resumenPedidosYaTurnos?.total
+          .descuento_local || 0
+      )
+    : descuentoLocalPedidosYa,
 
 ventas_brutas_pedidosya:
-  ventasBrutasPedidosYa,
+  detalleTurnosCompleto
+    ? Number(
+        resumenPedidosYaTurnos?.total
+          .ventas_brutas || 0
+      )
+    : ventasBrutasPedidosYa,
 
 ventas_paradise: ventasParadise,
 
 es_restaurante: esRestaurante,
 
 costo_productos_pedidosya:
-  costoProductosPedidosYa,
+  costoProductosPedidosYaConTurnos,
 
 margen_pedidosya:
-  margenPedidosYa,
+  margenPedidosYaConTurnos,
 
 margen_porcentaje_pedidosya:
   ventasPedidosYa > 0
-    ? (margenPedidosYa / ventasPedidosYa) * 100
+    ? (margenPedidosYaConTurnos /
+        ventasPedidosYa) *
+      100
     : 0,
   };
 }

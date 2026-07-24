@@ -10,6 +10,7 @@ type ReemplazarOrderDetailsInput = {
   periodo_id: string;
   periodo_anio?: number | null;
   periodo_mes?: number | null;
+  turno?: "general" | "mediodia" | "noche";
   pedidos: PedidoYaDetallePedido[];
 };
 
@@ -104,6 +105,7 @@ async function insertarPedidosEnLotes(
 export async function reemplazarOrderDetailsPedidosYa(
   input: ReemplazarOrderDetailsInput
 ) {
+  const turno = input.turno || "general";
   /*
    * Primero buscamos y eliminamos todos los pedidos
    * correspondientes exclusivamente al período y sucursal.
@@ -112,7 +114,8 @@ export async function reemplazarOrderDetailsPedidosYa(
     .from("pedidosya_pedidos")
     .select("id")
     .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id);
+    .eq("periodo_id", input.periodo_id)
+    .eq("turno", turno);
 
   if (input.sucursal_id) {
     buscarQuery = buscarQuery.eq(
@@ -142,7 +145,8 @@ export async function reemplazarOrderDetailsPedidosYa(
     .from("pedidosya_pedidos")
     .delete()
     .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id);
+    .eq("periodo_id", input.periodo_id)
+    .eq("turno", turno);
 
   if (input.sucursal_id) {
     deleteQuery = deleteQuery.eq(
@@ -172,6 +176,7 @@ export async function reemplazarOrderDetailsPedidosYa(
     periodo_id: input.periodo_id,
     periodo_anio: input.periodo_anio ?? null,
     periodo_mes: input.periodo_mes ?? null,
+    turno,
 
     numero_pedido: pedido.numero_pedido,
     fecha: pedido.fecha,
@@ -266,6 +271,7 @@ export async function reemplazarOrderDetailsPedidosYa(
         sucursal_id:
           input.sucursal_id || null,
         periodo_id: input.periodo_id,
+        turno,
         numero_pedido:
           pedido.numero_pedido,
         nombre_producto:

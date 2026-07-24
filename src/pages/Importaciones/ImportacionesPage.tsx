@@ -48,13 +48,61 @@ import type { Importacion } from "../../types/importacion";
 
 type TipoImportacion =
   | "pedidosya_csv"
+  | "pedidosya_csv_noche"
   | "pedidosya_productos_excel"
   | "pedidosya_order_details_csv"
+  | "pedidosya_order_details_csv_noche"
   | "isatech_pdf"
   | "paradise_pdf"
   | "produccion_excel"
   | "costos_excel"
   | "costos_duna_excel";
+
+type OpcionImportacion = {
+  value: TipoImportacion;
+  label: string;
+};
+
+const OPCIONES_HELADERIA: OpcionImportacion[] = [
+  {
+    value: "pedidosya_csv",
+    label: "PedidosYa resumen diario CSV",
+  },
+  { value: "isatech_pdf", label: "Isatech PDF" },
+  {
+    value: "produccion_excel",
+    label: "Producción Excel",
+  },
+  { value: "costos_excel", label: "Costos Excel" },
+];
+
+const OPCIONES_RESTAURANTE: OpcionImportacion[] = [
+  {
+    value: "pedidosya_csv",
+    label: "PedidosYa mediodía - ordersPerDay CSV",
+  },
+  {
+    value: "pedidosya_order_details_csv",
+    label: "PedidosYa mediodía - orderDetails CSV",
+  },
+  {
+    value: "pedidosya_productos_excel",
+    label: "PedidosYa mediodía - resumen de productos Excel",
+  },
+  {
+    value: "pedidosya_csv_noche",
+    label: "PedidosYa noche - ordersPerDay CSV",
+  },
+  {
+    value: "pedidosya_order_details_csv_noche",
+    label: "PedidosYa noche - orderDetails CSV",
+  },
+  { value: "paradise_pdf", label: "Paradise PDF" },
+  {
+    value: "costos_duna_excel",
+    label: "Costos Duna Excel",
+  },
+];
 
 type RentabilidadConCanal = RentabilidadProducto & {
   canal?: string;
@@ -104,6 +152,11 @@ export function ImportacionesPage() {
 
     if (data.length > 0) {
       setEmpresaId(data[0].id);
+      setTipoImportacion(
+        data[0].tipo_negocio === "restaurante"
+          ? "pedidosya_csv"
+          : "pedidosya_csv"
+      );
       await cargarDatosEmpresa(data[0].id);
     }
   }
@@ -123,6 +176,12 @@ export function ImportacionesPage() {
 
   async function cambiarEmpresa(id: string) {
     setEmpresaId(id);
+    const empresa = empresas.find((item) => item.id === id);
+    setTipoImportacion(
+      empresa?.tipo_negocio === "restaurante"
+        ? "pedidosya_csv"
+        : "pedidosya_csv"
+    );
     await cargarDatosEmpresa(id);
   }
 
@@ -144,6 +203,43 @@ export function ImportacionesPage() {
 
   function periodoActual() {
     return periodos.find((periodo) => periodo.id === periodoId) || null;
+  }
+
+  function empresaActual() {
+    return empresas.find(
+      (empresa) => empresa.id === empresaId
+    ) || null;
+  }
+
+  function esRestaurante() {
+    return empresaActual()?.tipo_negocio === "restaurante";
+  }
+
+  function opcionesImportacion() {
+    return esRestaurante()
+      ? OPCIONES_RESTAURANTE
+      : OPCIONES_HELADERIA;
+  }
+
+  function turnoImportacion():
+    | "general"
+    | "mediodia"
+    | "noche" {
+    if (!esRestaurante()) return "general";
+
+    if (
+      tipoImportacion === "pedidosya_csv_noche" ||
+      tipoImportacion ===
+        "pedidosya_order_details_csv_noche"
+    ) {
+      return "noche";
+    }
+
+    if (tipoImportacion.startsWith("pedidosya_")) {
+      return "mediodia";
+    }
+
+    return "general";
   }
 
   function requiereSucursal() {
@@ -244,6 +340,7 @@ export function ImportacionesPage() {
       periodo_mes: periodo.mes,
       archivo_nombre: input.archivo.name,
       tipo: input.tipo || tipoImportacion,
+      turno: turnoImportacion(),
       registros_importados: input.registros,
       errores: input.errores || 0,
     });
@@ -263,7 +360,10 @@ export function ImportacionesPage() {
 
       setMensaje("Procesando archivo...");
 
-      if (tipoImportacion === "pedidosya_csv") {
+      if (
+        tipoImportacion === "pedidosya_csv" ||
+        tipoImportacion === "pedidosya_csv_noche"
+      ) {
         const preview = await leerCsv(archivo);
         validarPedidoYaPeriodo(preview.filas, periodo);
         setCsvFilas(preview.filas);
@@ -281,13 +381,25 @@ export function ImportacionesPage() {
           pickup: numero(fila["Ventas con pickup"]),
         }));
 
-        await reemplazarVentasPedidosYa(empresaId, ventas);
+        await reemplazarVentasPedidosYa(
+          empresaId,
+          ventas,
+          turnoImportacion()
+        );
         await registrarImportacion({
           archivo,
           registros: ventas.length,
         });
 
-        setMensaje(`CSV diario de PedidosYa importado: ${ventas.length} filas.`);
+        setMensaje(
+          `CSV diario de PedidosYa ${
+            turnoImportacion() === "noche"
+              ? "noche"
+              : turnoImportacion() === "mediodia"
+                ? "mediodía"
+                : ""
+          } importado: ${ventas.length} filas.`
+        );
       }
 
       if (tipoImportacion === "pedidosya_productos_excel") {
@@ -312,7 +424,12 @@ export function ImportacionesPage() {
         );
       }
 
-      if (tipoImportacion === "pedidosya_order_details_csv") {
+      if (
+        tipoImportacion ===
+          "pedidosya_order_details_csv" ||
+        tipoImportacion ===
+          "pedidosya_order_details_csv_noche"
+      ) {
         const preview = await leerCsv(archivo);
         setCsvFilas(preview.filas);
 
@@ -324,6 +441,7 @@ export function ImportacionesPage() {
           periodo_id: periodo.id,
           periodo_anio: periodo.anio,
           periodo_mes: periodo.mes,
+          turno: turnoImportacion(),
           pedidos,
         });
 
@@ -333,7 +451,11 @@ export function ImportacionesPage() {
         });
 
         setMensaje(
-          `Order details importado: ${resultado.pedidos_importados} pedidos y ` +
+          `Order details ${
+            turnoImportacion() === "noche"
+              ? "noche"
+              : "mediodía"
+          } importado: ${resultado.pedidos_importados} pedidos y ` +
             `${resultado.productos_importados} líneas de productos.`
         );
       }
@@ -564,18 +686,14 @@ export function ImportacionesPage() {
             setTipoImportacion(e.target.value as TipoImportacion)
           }
         >
-          <option value="pedidosya_csv">PedidosYa resumen diario CSV</option>
-          <option value="pedidosya_productos_excel">
-            PedidosYa resumen de productos Excel
-          </option>
-          <option value="pedidosya_order_details_csv">
-            PedidosYa orderDetails CSV
-          </option>
-          <option value="isatech_pdf">Isatech PDF</option>
-          <option value="paradise_pdf">Paradise PDF</option>
-          <option value="produccion_excel">Producción Excel</option>
-          <option value="costos_excel">Costos Excel</option>
-          <option value="costos_duna_excel">Costos Duna Excel</option>
+          {opcionesImportacion().map((opcion) => (
+            <option
+              key={opcion.value}
+              value={opcion.value}
+            >
+              {opcion.label}
+            </option>
+          ))}
         </select>
 
         <label style={label}>Período</label>
@@ -630,33 +748,68 @@ export function ImportacionesPage() {
           <strong>{periodoActual()?.nombre || "Sin período"}</strong>
         </p>
 
-        <EstadoItem
-          label="PedidosYa resumen diario"
-          tipo="pedidosya_csv"
-          usaSucursal
-        />
-        <EstadoItem
-          label="PedidosYa productos"
-          tipo="pedidosya_productos_excel"
-          usaSucursal
-        />
-        <EstadoItem
-          label="PedidosYa orderDetails"
-          tipo="pedidosya_order_details_csv"
-          usaSucursal
-        />
-        <EstadoItem label="Isatech" tipo="isatech_pdf" usaSucursal />
-        <EstadoItem label="Paradise" tipo="paradise_pdf" usaSucursal />
-        <EstadoItem
-          label="Producción"
-          tipo="produccion_excel"
-          usaSucursal={false}
-        />
-        <EstadoItem
-          label="Costos Duna"
-          tipo="costos_duna_excel"
-          usaSucursal={false}
-        />
+        {esRestaurante() ? (
+          <>
+            <EstadoItem
+              label="PedidosYa mediodía - ordersPerDay"
+              tipo="pedidosya_csv"
+              usaSucursal
+            />
+            <EstadoItem
+              label="PedidosYa mediodía - productos"
+              tipo="pedidosya_productos_excel"
+              usaSucursal
+            />
+            <EstadoItem
+              label="PedidosYa mediodía - orderDetails"
+              tipo="pedidosya_order_details_csv"
+              usaSucursal
+            />
+            <EstadoItem
+              label="PedidosYa noche - ordersPerDay"
+              tipo="pedidosya_csv_noche"
+              usaSucursal
+            />
+            <EstadoItem
+              label="PedidosYa noche - orderDetails"
+              tipo="pedidosya_order_details_csv_noche"
+              usaSucursal
+            />
+            <EstadoItem
+              label="Paradise"
+              tipo="paradise_pdf"
+              usaSucursal
+            />
+            <EstadoItem
+              label="Costos Duna"
+              tipo="costos_duna_excel"
+              usaSucursal={false}
+            />
+          </>
+        ) : (
+          <>
+            <EstadoItem
+              label="PedidosYa resumen diario"
+              tipo="pedidosya_csv"
+              usaSucursal
+            />
+            <EstadoItem
+              label="Isatech"
+              tipo="isatech_pdf"
+              usaSucursal
+            />
+            <EstadoItem
+              label="Producción"
+              tipo="produccion_excel"
+              usaSucursal={false}
+            />
+            <EstadoItem
+              label="Costos"
+              tipo="costos_excel"
+              usaSucursal={false}
+            />
+          </>
+        )}
 
         <button
   type="button"

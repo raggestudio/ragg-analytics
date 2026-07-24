@@ -21,6 +21,12 @@ export type ResumenTurnoPedidosYa = {
   ganancia_neta: number;
   margen_porcentaje: number;
   productos_sin_costo: number;
+  productos: Array<{
+    nombre: string;
+    unidades: number;
+    facturacion: number;
+    ganancia: number;
+  }>;
   top_productos: Array<{
     nombre: string;
     unidades: number;
@@ -87,6 +93,7 @@ function resumenVacio(
     ganancia_neta: 0,
     margen_porcentaje: 0,
     productos_sin_costo: 0,
+    productos: [],
     top_productos: [],
     pedidos_detalle: 0,
     detalle_disponible: false,
@@ -163,7 +170,7 @@ function sumar(
     }
   >();
   for (const resumen of resumenes) {
-    for (const producto of resumen.top_productos) {
+    for (const producto of resumen.productos) {
       const clave = normalizar(producto.nombre);
       const existente = productos.get(clave);
       productos.set(clave, {
@@ -180,11 +187,11 @@ function sumar(
       });
     }
   }
-  resultado.top_productos = Array.from(
-    productos.values()
-  )
-    .sort((a, b) => b.unidades - a.unidades)
-    .slice(0, 5);
+  resultado.productos = Array.from(productos.values()).sort(
+    (a, b) => b.unidades - a.unidades
+  );
+  resultado.top_productos =
+    resultado.productos.slice(0, 5);
 
   return resultado;
 }
@@ -533,7 +540,19 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
 
     porTurno[turno].productos_sin_costo =
       sinCostoPorTurno[turno].size;
-    porTurno[turno].top_productos = Array.from(
+    const ventasBrutasProductos = Array.from(
+      productosPorTurno[turno].values()
+    ).reduce(
+      (total, producto) => total + producto.ventas,
+      0
+    );
+
+    const costoCanal =
+      porTurno[turno].comision +
+      porTurno[turno].iva_comision +
+      porTurno[turno].tarifa_pago_linea;
+
+    porTurno[turno].productos = Array.from(
       productosPorTurno[turno].values()
     )
       .map((producto) => {
@@ -543,16 +562,34 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
           costoPorNombre.get(clave) ??
           0;
         const costo = costoUnitario * producto.unidades;
+        const participacion =
+          ventasBrutasProductos > 0
+            ? producto.ventas / ventasBrutasProductos
+            : 0;
+        const descuentoLocal =
+          porTurno[turno].descuento_local *
+          participacion;
+        const costoCanalAsignado =
+          costoCanal * participacion;
+        const ventaEfectiva = Math.max(
+          producto.ventas - descuentoLocal,
+          0
+        );
 
         return {
           nombre: producto.nombre,
           unidades: producto.unidades,
-          facturacion: producto.ventas,
-          ganancia: producto.ventas - costo,
+          facturacion: ventaEfectiva,
+          ganancia:
+            ventaEfectiva -
+            costo -
+            costoCanalAsignado,
         };
       })
-      .sort((a, b) => b.unidades - a.unidades)
-      .slice(0, 5);
+      .sort((a, b) => b.unidades - a.unidades);
+
+    porTurno[turno].top_productos =
+      porTurno[turno].productos.slice(0, 5);
   }
 
   return {

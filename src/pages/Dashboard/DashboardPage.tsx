@@ -25,6 +25,7 @@ import {
   type EvolucionDashboardItem,
   obtenerTopPedidosYa,
   obtenerTopParadise,
+  obtenerTopIsatechLocal,
   type RankingCanalItem,
 } from "../../services/dashboardService";
 import ExecutiveSummary from "../../components/dashboard/ExecutiveSummary";
@@ -69,6 +70,8 @@ export function DashboardPage() {
   const [evolucion, setEvolucion] = useState<EvolucionDashboardItem[]>([]);
   const [topPedidosYa, setTopPedidosYa] = useState<RankingCanalItem[]>([]);
   const [topParadise, setTopParadise] =
+    useState<RankingCanalItem[]>([]);
+  const [topIsatechLocal, setTopIsatechLocal] =
     useState<RankingCanalItem[]>([]);
   const [resumenTurnos, setResumenTurnos] =
     useState<ResumenPedidosYaPorTurno | null>(null);
@@ -277,7 +280,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
   forzarActualizacion = false
 ) {
   const claveCache = [
-    "dashboard-cache-v5",
+    "dashboard-cache-v6",
     empresaId,
     periodoId,
     sucursalId || "todas",
@@ -315,6 +318,9 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
           );
           setTopParadise(
             cache.topParadise || []
+          );
+          setTopIsatechLocal(
+            cache.topIsatechLocal || []
           );
           setSaboresPedidosYa(
             cache.saboresPedidosYa || []
@@ -365,6 +371,8 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
       const evolucionData = await obtenerEvolucionDashboard(input);
       const topPedidosYaData = await obtenerTopPedidosYa(input);
       const topParadiseData = await obtenerTopParadise(input);
+      const topIsatechLocalData =
+        await obtenerTopIsatechLocal(input);
 const periodoIdsSabores = obtenerPeriodoIdsSeleccionados();
 
 const empresaSeleccionada = empresas.find(
@@ -416,6 +424,7 @@ setResumenTurnos(resumenTurnosData);
       setEvolucion(evolucionData);
       setTopPedidosYa(topPedidosYaUnificado);
       setTopParadise(topParadiseData);
+      setTopIsatechLocal(topIsatechLocalData);
       const insightsCalculados = generarInsights(
   comparativoData.actual,
   comparativoData.anterior
@@ -437,6 +446,8 @@ sessionStorage.setItem(
       topPedidosYaUnificado,
     topParadise:
       topParadiseData,
+    topIsatechLocal:
+      topIsatechLocalData,
     saboresPedidosYa: sabores,
     costosSaboresPedidosYa:
       costosSabores,
@@ -993,6 +1004,25 @@ function textoComparacion() {
           resumen.participacion_pedidosya
         )}
       />
+
+      <Metric
+        title="Costo de productos según Isatech"
+        value={moneda(
+          resumen.costo_productos_pedidosya
+        )}
+      />
+
+      <Metric
+        title="Ganancia neta PedidosYa"
+        value={moneda(resumen.margen_pedidosya)}
+      />
+
+      <Metric
+        title="Margen PedidosYa"
+        value={porcentaje(
+          resumen.margen_porcentaje_pedidosya
+        )}
+      />
     </>
   )}
 </div>
@@ -1237,6 +1267,74 @@ function textoComparacion() {
           <strong>Ganancia</strong>
         </div>
         {topParadise.map((item, index) => (
+          <div key={item.nombre} style={pyTableRow}>
+            <span>
+              {index + 1}. {item.nombre}
+            </span>
+            <span>
+              {item.cantidad.toLocaleString("es-UY")}
+            </span>
+            <span>{moneda(item.ventas)}</span>
+            <span>{moneda(item.margen)}</span>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+)}
+
+{!resumen.es_restaurante && (
+  <section style={card}>
+    <h3>Isatech - ventas en el local</h3>
+
+    <div style={metricGrid}>
+      <Metric
+        title="Facturación en el local"
+        value={moneda(resumen.ventas_directas)}
+      />
+      <Metric
+        title="Unidades vendidas"
+        value={Number(
+          resumen.unidades_local || 0
+        ).toLocaleString("es-UY")}
+      />
+      <Metric
+        title="Precio promedio por unidad"
+        value={moneda(
+          resumen.unidades_local > 0
+            ? resumen.ventas_directas /
+                resumen.unidades_local
+            : 0
+        )}
+      />
+      <Metric
+        title="Costo de productos"
+        value={moneda(
+          resumen.costo_productos_local
+        )}
+      />
+      <Metric
+        title="Ganancia del local"
+        value={moneda(resumen.margen_local)}
+      />
+      <Metric
+        title="Margen del local"
+        value={porcentaje(
+          resumen.margen_porcentaje_local
+        )}
+      />
+    </div>
+
+    {topIsatechLocal.length > 0 && (
+      <div style={{ marginTop: 24 }}>
+        <h4>Top 5 de ventas en el local</h4>
+        <div style={pyTableHeader}>
+          <strong>Producto</strong>
+          <strong>Unidades</strong>
+          <strong>Facturación</strong>
+          <strong>Ganancia</strong>
+        </div>
+        {topIsatechLocal.map((item, index) => (
           <div key={item.nombre} style={pyTableRow}>
             <span>
               {index + 1}. {item.nombre}

@@ -35,6 +35,10 @@ ventas_brutas_pedidosya: number;
   costo_productos_paradise: number;
   margen_paradise: number;
   margen_porcentaje_paradise: number;
+  unidades_local: number;
+  costo_productos_local: number;
+  margen_local: number;
+  margen_porcentaje_local: number;
   es_restaurante: boolean;
   costo_productos_pedidosya: number;
   margen_pedidosya: number;
@@ -241,6 +245,24 @@ export async function obtenerDashboardResumen(input: {
   const filasPedidosYa = (rentabilidad || []).filter(
     (item: any) => item.canal === "PedidosYa"
   );
+  const filasIsatechPedidosYa = !esRestaurante
+    ? (rentabilidad || []).filter(
+        (item: any) =>
+          item.canal === "Paradise" &&
+          normalizar(item.categoria || "").includes(
+            "pedidos ya"
+          )
+      )
+    : [];
+  const filasIsatechLocal = !esRestaurante
+    ? (rentabilidad || []).filter(
+        (item: any) =>
+          item.canal === "Paradise" &&
+          !normalizar(item.categoria || "").includes(
+            "pedidos ya"
+          )
+      )
+    : [];
   const comisionPedidosYa = filasPedidosYa.reduce(
   (total: number, item: any) =>
     total + Number(item.comision || 0),
@@ -303,6 +325,22 @@ const costosCanal =
   );
   const margenPedidosYa = filasPedidosYa.reduce(
     (acc: number, item: any) => acc + Number(item.margen || 0), 0
+  );
+  const costoProductosPedidosYaPiu =
+    filasIsatechPedidosYa.reduce(
+      (total: number, item: any) =>
+        total + Number(item.costo_total || 0),
+      0
+    );
+  const unidadesLocal = filasIsatechLocal.reduce(
+    (total: number, item: any) =>
+      total + Number(item.cantidad || 0),
+    0
+  );
+  const costoProductosLocal = filasIsatechLocal.reduce(
+    (total: number, item: any) =>
+      total + Number(item.costo_total || 0),
+    0
   );
 
   const detalleTurnosCompleto = Boolean(
@@ -484,6 +522,19 @@ const costosCanal =
     ventasTotalesAjustadas - ventasPedidosYa,
     0
   );
+  const costoPedidosYaFinal = esRestaurante
+    ? costoProductosPedidosYaConTurnos
+    : costoProductosPedidosYaPiu;
+  const margenPedidosYaFinal = esRestaurante
+    ? margenPedidosYaConTurnos
+    : Math.max(
+        ventasPedidosYa - costoProductosPedidosYaPiu,
+        0
+      );
+  const margenLocal = Math.max(
+    ventasDirectas - costoProductosLocal,
+    0
+  );
 
   return {
     ventas_totales: ventasTotalesAjustadas,
@@ -596,16 +647,23 @@ margen_porcentaje_paradise:
 es_restaurante: esRestaurante,
 
 costo_productos_pedidosya:
-  costoProductosPedidosYaConTurnos,
+  costoPedidosYaFinal,
 
 margen_pedidosya:
-  margenPedidosYaConTurnos,
+  margenPedidosYaFinal,
 
 margen_porcentaje_pedidosya:
   ventasPedidosYa > 0
-    ? (margenPedidosYaConTurnos /
+    ? (margenPedidosYaFinal /
         ventasPedidosYa) *
       100
+    : 0,
+unidades_local: unidadesLocal,
+costo_productos_local: costoProductosLocal,
+margen_local: margenLocal,
+margen_porcentaje_local:
+  ventasDirectas > 0
+    ? (margenLocal / ventasDirectas) * 100
     : 0,
 pedidosya_detalle_incompleto:
   esRestaurante && !detalleTurnosCompleto,
@@ -820,6 +878,31 @@ ventas_brutas_pedidosya:
                 total + Number(item.ventas_paradise || 0),
               0
             )) *
+          100
+        : 0,
+    unidades_local: resumenes.reduce(
+      (total, item) =>
+        total + Number(item.unidades_local || 0),
+      0
+    ),
+    costo_productos_local: resumenes.reduce(
+      (total, item) =>
+        total + Number(item.costo_productos_local || 0),
+      0
+    ),
+    margen_local: resumenes.reduce(
+      (total, item) =>
+        total + Number(item.margen_local || 0),
+      0
+    ),
+    margen_porcentaje_local:
+      ventasDirectas > 0
+        ? (resumenes.reduce(
+            (total, item) =>
+              total + Number(item.margen_local || 0),
+            0
+          ) /
+            ventasDirectas) *
           100
         : 0,
     es_restaurante: resumenes.some((item) => item.es_restaurante),
@@ -1407,6 +1490,60 @@ export async function obtenerTopParadise(input: {
   const agrupados = new Map<string, RankingCanalItem>();
 
   for (const fila of data || []) {
+    const actual = agrupados.get(fila.nombre_producto) || {
+      nombre: fila.nombre_producto,
+      cantidad: 0,
+      ventas: 0,
+      margen: 0,
+    };
+
+    actual.cantidad += Number(fila.cantidad || 0);
+    actual.ventas += Number(fila.ventas || 0);
+    actual.margen += Number(fila.margen || 0);
+    agrupados.set(fila.nombre_producto, actual);
+  }
+
+  return Array.from(agrupados.values())
+    .sort((a, b) => b.ventas - a.ventas)
+    .slice(0, 5);
+}
+
+export async function obtenerTopIsatechLocal(input: {
+  empresa_id: string;
+  periodo_id: string;
+  sucursal_id?: string | null;
+  modo?: "mensual" | "trimestral" | "anual" | "personalizado";
+  periodo_desde_id?: string | null;
+  periodo_hasta_id?: string | null;
+}): Promise<RankingCanalItem[]> {
+  const periodoIds = await obtenerIdsPeriodosParaModo(input);
+  if (periodoIds.length === 0) return [];
+
+  let query = supabase
+    .from("rentabilidad_periodo")
+    .select(
+      "nombre_producto, categoria, cantidad, ventas, margen"
+    )
+    .eq("empresa_id", input.empresa_id)
+    .eq("canal", "Paradise")
+    .in("periodo_id", periodoIds);
+
+  if (input.sucursal_id) {
+    query = query.eq("sucursal_id", input.sucursal_id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const agrupados = new Map<string, RankingCanalItem>();
+
+  for (const fila of data || []) {
+    if (
+      normalizar(fila.categoria || "").includes("pedidos ya")
+    ) {
+      continue;
+    }
+
     const actual = agrupados.get(fila.nombre_producto) || {
       nombre: fila.nombre_producto,
       cantidad: 0,

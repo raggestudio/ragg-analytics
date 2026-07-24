@@ -30,12 +30,6 @@ import {
   validarPedidoYaPeriodo,
 } from "../../services/validacionImportaciones";
 import {
-  leerExcelProductosPedidosYa,
-} from "../../services/pedidosYaProductosParser";
-import {
-  reemplazarProductosPedidosYa,
-} from "../../services/pedidosYaProductosService";
-import {
   parsearFilasOrderDetailsPedidosYa,
 } from "../../services/pedidosYaOrderDetailsParser";
 import {
@@ -56,7 +50,6 @@ type TipoImportacion =
   | "pedidosya_csv"
   | "pedidosya_sabores_csv"
   | "pedidosya_csv_noche"
-  | "pedidosya_productos_excel"
   | "pedidosya_order_details_csv"
   | "pedidosya_order_details_csv_noche"
   | "isatech_pdf"
@@ -95,10 +88,7 @@ const OPCIONES_RESTAURANTE: OpcionImportacion[] = [
   {
     value: "pedidosya_order_details_csv",
     label: "PedidosYa mediodía - orderDetails CSV",
-  },
-  {
-    value: "pedidosya_productos_excel",
-    label: "PedidosYa mediodía - resumen de productos Excel",
+
   },
   {
     value: "pedidosya_csv_noche",
@@ -472,27 +462,6 @@ export function ImportacionesPage() {
         );
       }
 
-      if (tipoImportacion === "pedidosya_productos_excel") {
-        const productos = await leerExcelProductosPedidosYa(archivo);
-
-        await reemplazarProductosPedidosYa({
-          empresa_id: empresaId,
-          sucursal_id: sucursalId,
-          periodo_id: periodo.id,
-          periodo_anio: periodo.anio,
-          periodo_mes: periodo.mes,
-          productos,
-        });
-
-        await registrarImportacion({
-          archivo,
-          registros: productos.length,
-        });
-
-        setMensaje(
-          `Resumen de productos PedidosYa importado: ${productos.length} productos.`
-        );
-      }
 
       if (
         tipoImportacion ===
@@ -825,11 +794,7 @@ export function ImportacionesPage() {
               tipo="pedidosya_csv"
               usaSucursal
             />
-            <EstadoItem
-              label="PedidosYa mediodía - productos"
-              tipo="pedidosya_productos_excel"
-              usaSucursal
-            />
+            
             <EstadoItem
               label="PedidosYa mediodía - orderDetails"
               tipo="pedidosya_order_details_csv"

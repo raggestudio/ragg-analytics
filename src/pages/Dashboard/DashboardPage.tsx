@@ -1120,13 +1120,19 @@ function textoComparacion() {
       {resumenTurnoActual.top_productos.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <h4>
-            Top 5 productos por unidades ·{" "}
+            Top 5 productos ·{" "}
             {vistaTurno === "total"
               ? "Total"
               : vistaTurno === "mediodia"
                 ? "Mediodía"
                 : "Noche"}
           </h4>
+          <div style={pyTableHeader}>
+            <span>Producto</span>
+            <span>Unidades</span>
+            <span>Facturación</span>
+            <span>Ganancia</span>
+          </div>
           {resumenTurnoActual.top_productos.map(
             (producto, index) => (
               <div
@@ -1137,11 +1143,10 @@ function textoComparacion() {
                   {index + 1}. {producto.nombre}
                 </span>
                 <span>
-                  {producto.unidades.toLocaleString(
-                    "es-UY"
-                  )}{" "}
-                  unidades
+                  {producto.unidades.toLocaleString("es-UY")}
                 </span>
+                <span>{moneda(producto.facturacion)}</span>
+                <span>{moneda(producto.ganancia)}</span>
               </div>
             )
           )}

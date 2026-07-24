@@ -30,6 +30,13 @@ import {
   validarPedidoYaPeriodo,
 } from "../../services/validacionImportaciones";
 import {
+  leerExcelProductosPedidosYa,
+  parsearFilasProductosPedidosYa,
+} from "../../services/pedidosYaProductosParser";
+import {
+  reemplazarProductosPedidosYa,
+} from "../../services/pedidosYaProductosService";
+import {
   parsearFilasOrderDetailsPedidosYa,
 } from "../../services/pedidosYaOrderDetailsParser";
 import {
@@ -50,6 +57,8 @@ type TipoImportacion =
   | "pedidosya_csv"
   | "pedidosya_sabores_csv"
   | "pedidosya_csv_noche"
+  | "pedidosya_productos_excel"
+  | "pedidosya_productos_csv_noche"
   | "pedidosya_order_details_csv"
   | "pedidosya_order_details_csv_noche"
   | "isatech_pdf"
@@ -82,17 +91,16 @@ const OPCIONES_HELADERIA: OpcionImportacion[] = [
 
 const OPCIONES_RESTAURANTE: OpcionImportacion[] = [
   {
-    value: "pedidosya_csv",
-    label: "PedidosYa mediodía - ordersPerDay CSV",
+    value: "pedidosya_productos_excel",
+    label: "PedidosYa mediodía - productos Excel",
   },
   {
     value: "pedidosya_order_details_csv",
     label: "PedidosYa mediodía - orderDetails CSV",
-
   },
   {
-    value: "pedidosya_csv_noche",
-    label: "PedidosYa noche - ordersPerDay CSV",
+    value: "pedidosya_productos_csv_noche",
+    label: "PedidosYa noche - productos CSV",
   },
   {
     value: "pedidosya_order_details_csv_noche",
@@ -259,6 +267,7 @@ export function ImportacionesPage() {
 
     if (
       tipoImportacion === "pedidosya_csv_noche" ||
+      tipoImportacion === "pedidosya_productos_csv_noche" ||
       tipoImportacion ===
         "pedidosya_order_details_csv_noche"
     ) {
@@ -462,6 +471,40 @@ export function ImportacionesPage() {
         );
       }
 
+      if (
+        tipoImportacion === "pedidosya_productos_excel" ||
+        tipoImportacion === "pedidosya_productos_csv_noche"
+      ) {
+        const productos =
+          tipoImportacion === "pedidosya_productos_excel"
+            ? await leerExcelProductosPedidosYa(archivo)
+            : parsearFilasProductosPedidosYa(
+                (await leerCsv(archivo)).filas
+              );
+
+        await reemplazarProductosPedidosYa({
+          empresa_id: empresaId,
+          sucursal_id: sucursalId,
+          periodo_id: periodo.id,
+          periodo_anio: periodo.anio,
+          periodo_mes: periodo.mes,
+          turno: turnoImportacion(),
+          productos,
+        });
+
+        await registrarImportacion({
+          archivo,
+          registros: productos.length,
+        });
+
+        setMensaje(
+          `Productos PedidosYa ${
+            turnoImportacion() === "noche"
+              ? "noche"
+              : "mediodía"
+          } importados: ${productos.length}.`
+        );
+      }
 
       if (
         tipoImportacion ===
@@ -790,19 +833,18 @@ export function ImportacionesPage() {
         {esRestaurante() ? (
           <>
             <EstadoItem
-              label="PedidosYa mediodía - ordersPerDay"
-              tipo="pedidosya_csv"
+              label="PedidosYa mediodía - productos"
+              tipo="pedidosya_productos_excel"
               usaSucursal
             />
-            
             <EstadoItem
               label="PedidosYa mediodía - orderDetails"
               tipo="pedidosya_order_details_csv"
               usaSucursal
             />
             <EstadoItem
-              label="PedidosYa noche - ordersPerDay"
-              tipo="pedidosya_csv_noche"
+              label="PedidosYa noche - productos"
+              tipo="pedidosya_productos_csv_noche"
               usaSucursal
             />
             <EstadoItem

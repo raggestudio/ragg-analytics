@@ -70,6 +70,12 @@ export async function leerExcelProductosPedidosYa(
     raw: false,
   });
 
+  return parsearFilasProductosPedidosYa(filas);
+}
+
+export function parsearFilasProductosPedidosYa(
+  filas: Record<string, unknown>[]
+): ProductoResumenPedidosYa[] {
   const productos = filas
     .map((fila) => {
       const nombre = String(

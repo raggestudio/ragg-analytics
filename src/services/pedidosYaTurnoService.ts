@@ -24,6 +24,8 @@ export type ResumenTurnoPedidosYa = {
   top_productos: Array<{
     nombre: string;
     unidades: number;
+    facturacion: number;
+    ganancia: number;
   }>;
   pedidos_detalle: number;
   detalle_disponible: boolean;
@@ -40,6 +42,14 @@ function normalizar(texto: unknown) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function nombreProductoBase(texto: unknown) {
+  return String(texto || "Sin nombre")
+    .replace(/^\s*\d+(?:[.,]\d+)?\s*[xX×]?\s+/, "")
+    .replace(/\s*\[[^\]]*\]\s*$/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -143,20 +153,36 @@ function sumar(
         100
       : 0;
 
-  const productos = new Map<string, number>();
+  const productos = new Map<
+    string,
+    {
+      nombre: string;
+      unidades: number;
+      facturacion: number;
+      ganancia: number;
+    }
+  >();
   for (const resumen of resumenes) {
     for (const producto of resumen.top_productos) {
-      productos.set(
-        producto.nombre,
-        Number(productos.get(producto.nombre) || 0) +
-          producto.unidades
-      );
+      const clave = normalizar(producto.nombre);
+      const existente = productos.get(clave);
+      productos.set(clave, {
+        nombre: existente?.nombre || producto.nombre,
+        unidades:
+          Number(existente?.unidades || 0) +
+          producto.unidades,
+        facturacion:
+          Number(existente?.facturacion || 0) +
+          producto.facturacion,
+        ganancia:
+          Number(existente?.ganancia || 0) +
+          producto.ganancia,
+      });
     }
   }
   resultado.top_productos = Array.from(
-    productos.entries()
+    productos.values()
   )
-    .map(([nombre, unidades]) => ({ nombre, unidades }))
     .sort((a, b) => b.unidades - a.unidades)
     .slice(0, 5);
 
@@ -178,12 +204,34 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     };
   }
 
+  const { data: periodos, error: periodosError } =
+    await supabase
+      .from("periodos")
+      .select("id, anio, mes")
+      .in("id", input.periodo_ids);
+
+  if (periodosError) throw periodosError;
+
+  const periodosSeleccionados = new Set(
+    (periodos || []).map(
+      (periodo) =>
+        `${Number(periodo.anio)}-${Number(periodo.mes)}`
+    )
+  );
+
   let ventasQuery = supabase
     .from("ventas")
-    .select("turno, pedidos, ventas, total")
+    .select(`
+      turno,
+      pedidos,
+      ventas,
+      total,
+      periodo_id,
+      periodo_anio,
+      periodo_mes
+    `)
     .eq("empresa_id", input.empresa_id)
-    .eq("origen", "PedidosYa")
-    .in("periodo_id", input.periodo_ids);
+    .eq("origen", "PedidosYa");
 
   let pedidosQuery = supabase
     .from("pedidosya_pedidos")
@@ -207,6 +255,17 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     .eq("empresa_id", input.empresa_id)
     .in("periodo_id", input.periodo_ids);
 
+  let resumenProductosQuery = supabase
+    .from("pedidosya_producto_resumen")
+    .select(`
+      turno,
+      nombre_producto,
+      cantidad,
+      ventas
+    `)
+    .eq("empresa_id", input.empresa_id)
+    .in("periodo_id", input.periodo_ids);
+
   if (input.sucursal_id) {
     ventasQuery = ventasQuery.eq(
       "sucursal_id",
@@ -220,18 +279,27 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       "sucursal_id",
       input.sucursal_id
     );
+    resumenProductosQuery = resumenProductosQuery.eq(
+      "sucursal_id",
+      input.sucursal_id
+    );
   }
 
   const [
     { data: ventas, error: ventasError },
     { data: pedidos, error: pedidosError },
     { data: productos, error: productosError },
+    {
+      data: resumenProductos,
+      error: resumenProductosError,
+    },
     { data: costos, error: costosError },
     { data: vinculaciones, error: vinculacionesError },
   ] = await Promise.all([
     ventasQuery,
     pedidosQuery,
     productosQuery,
+    resumenProductosQuery,
     supabase
       .from("producto_costo_manual")
       .select("id, nombre_producto, costo")
@@ -252,6 +320,7 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   if (ventasError) throw ventasError;
   if (pedidosError) throw pedidosError;
   if (productosError) throw productosError;
+  if (resumenProductosError) throw resumenProductosError;
   if (costosError) throw costosError;
   if (vinculacionesError) throw vinculacionesError;
 
@@ -261,6 +330,18 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   };
 
   for (const venta of ventas || []) {
+    const perteneceAlPeriodo =
+      input.periodo_ids.includes(
+        String(venta.periodo_id || "")
+      ) ||
+      periodosSeleccionados.has(
+        `${Number(venta.periodo_anio)}-${Number(
+          venta.periodo_mes
+        )}`
+      );
+
+    if (!perteneceAlPeriodo) continue;
+
     const turno =
       venta.turno === "noche" ? "noche" : "mediodia";
     porTurno[turno].pedidos += Number(venta.pedidos || 0);
@@ -328,8 +409,14 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   }
 
   const productosPorTurno = {
-    mediodia: new Map<string, number>(),
-    noche: new Map<string, number>(),
+    mediodia: new Map<
+      string,
+      { nombre: string; unidades: number; ventas: number }
+    >(),
+    noche: new Map<
+      string,
+      { nombre: string; unidades: number; ventas: number }
+    >(),
   };
   const sinCostoPorTurno = {
     mediodia: new Set<string>(),
@@ -339,19 +426,11 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   for (const producto of productos || []) {
     const turno =
       producto.turno === "noche" ? "noche" : "mediodia";
-    const nombre = String(
-      producto.nombre_producto || "Sin nombre"
-    ).trim();
+    const nombre = nombreProductoBase(
+      producto.nombre_producto
+    );
     const clave = normalizar(nombre);
     const cantidad = Number(producto.cantidad || 0);
-    const mapa = productosPorTurno[turno];
-
-    mapa.set(
-      nombre,
-      Number(mapa.get(nombre) || 0) + cantidad
-    );
-    porTurno[turno].unidades += cantidad;
-
     const costoUnitario =
       costoVinculado.get(clave) ??
       costoPorNombre.get(clave);
@@ -366,6 +445,26 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
 
     porTurno[turno].costo_productos +=
       costoUnitario * cantidad;
+  }
+
+  for (const producto of resumenProductos || []) {
+    const turno =
+      producto.turno === "noche" ? "noche" : "mediodia";
+    const nombre = nombreProductoBase(
+      producto.nombre_producto
+    );
+    const clave = normalizar(nombre);
+    const cantidad = Number(producto.cantidad || 0);
+    const ventasProducto = Number(producto.ventas || 0);
+    const existente = productosPorTurno[turno].get(clave);
+
+    productosPorTurno[turno].set(clave, {
+      nombre: existente?.nombre || nombre,
+      unidades:
+        Number(existente?.unidades || 0) + cantidad,
+      ventas:
+        Number(existente?.ventas || 0) + ventasProducto,
+    });
   }
 
   for (const resumen of Object.values(porTurno)) {
@@ -390,15 +489,43 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   }
 
   for (const turno of ["mediodia", "noche"] as const) {
+    const facturacionProductos = Array.from(
+      productosPorTurno[turno].values()
+    ).reduce(
+      (total, producto) => total + producto.ventas,
+      0
+    );
+
+    if (facturacionProductos > 0) {
+      porTurno[turno].facturacion =
+        facturacionProductos;
+      porTurno[turno].ticket_promedio =
+        porTurno[turno].pedidos > 0
+          ? facturacionProductos /
+            porTurno[turno].pedidos
+          : 0;
+    }
+
     porTurno[turno].productos_sin_costo =
       sinCostoPorTurno[turno].size;
     porTurno[turno].top_productos = Array.from(
-      productosPorTurno[turno].entries()
+      productosPorTurno[turno].values()
     )
-      .map(([nombre, unidades]) => ({
-        nombre,
-        unidades,
-      }))
+      .map((producto) => {
+        const clave = normalizar(producto.nombre);
+        const costoUnitario =
+          costoVinculado.get(clave) ??
+          costoPorNombre.get(clave) ??
+          0;
+        const costo = costoUnitario * producto.unidades;
+
+        return {
+          nombre: producto.nombre,
+          unidades: producto.unidades,
+          facturacion: producto.ventas,
+          ganancia: producto.ventas - costo,
+        };
+      })
       .sort((a, b) => b.unidades - a.unidades)
       .slice(0, 5);
   }

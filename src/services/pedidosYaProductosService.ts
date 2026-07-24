@@ -7,6 +7,7 @@ type ReemplazarProductosPedidosYaInput = {
   periodo_id: string;
   periodo_anio?: number | null;
   periodo_mes?: number | null;
+  turno?: "general" | "mediodia" | "noche";
   productos: ProductoResumenPedidosYa[];
 };
 
@@ -17,7 +18,8 @@ export async function reemplazarProductosPedidosYa(
     .from("pedidosya_producto_resumen")
     .delete()
     .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id);
+    .eq("periodo_id", input.periodo_id)
+    .eq("turno", input.turno || "general");
 
   if (input.sucursal_id) {
     deleteQuery = deleteQuery.eq("sucursal_id", input.sucursal_id);
@@ -34,6 +36,7 @@ export async function reemplazarProductosPedidosYa(
     periodo_id: input.periodo_id,
     periodo_anio: input.periodo_anio || null,
     periodo_mes: input.periodo_mes || null,
+    turno: input.turno || "general",
     codigo_producto: producto.codigo_producto || null,
     nombre_producto: producto.nombre_producto,
     categoria: producto.categoria || null,

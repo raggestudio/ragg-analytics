@@ -277,7 +277,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
   forzarActualizacion = false
 ) {
   const claveCache = [
-    "dashboard-cache-v4",
+    "dashboard-cache-v5",
     empresaId,
     periodoId,
     sucursalId || "todas",
@@ -380,6 +380,18 @@ const resumenTurnosData =
       })
     : null;
 
+const topPedidosYaUnificado =
+  resumenTurnosData
+    ? resumenTurnosData.total.top_productos.map(
+        (producto) => ({
+          nombre: producto.nombre,
+          cantidad: producto.unidades,
+          ventas: producto.facturacion,
+          margen: producto.ganancia,
+        })
+      )
+    : topPedidosYaData;
+
 const filasSabores = await obtenerSaboresPedidosYaPorPeriodos({
   empresa_id: empresaId,
   periodo_ids: periodoIdsSabores,
@@ -402,7 +414,7 @@ setResumenTurnos(resumenTurnosData);
       setTopRentabilidad(topRentabilidadData);
       setTopFacturacion(topFacturacionData);
       setEvolucion(evolucionData);
-      setTopPedidosYa(topPedidosYaData);
+      setTopPedidosYa(topPedidosYaUnificado);
       setTopParadise(topParadiseData);
       const insightsCalculados = generarInsights(
   comparativoData.actual,
@@ -422,7 +434,7 @@ sessionStorage.setItem(
       topFacturacionData,
     evolucion: evolucionData,
     topPedidosYa:
-      topPedidosYaData,
+      topPedidosYaUnificado,
     topParadise:
       topParadiseData,
     saboresPedidosYa: sabores,

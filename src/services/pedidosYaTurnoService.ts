@@ -48,7 +48,7 @@ function normalizar(texto: unknown) {
 function nombreProductoBase(texto: unknown) {
   return String(texto || "Sin nombre")
     .replace(/^\s*\d+(?:[.,]\d+)?\s*[xX×]?\s+/, "")
-    .replace(/\s*\[[^\]]*\]\s*$/g, "")
+    .replace(/\s*\[[^\]]*\]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -261,10 +261,12 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       turno,
       nombre_producto,
       cantidad,
-      ventas
+      ventas,
+      periodo_id,
+      periodo_anio,
+      periodo_mes
     `)
-    .eq("empresa_id", input.empresa_id)
-    .in("periodo_id", input.periodo_ids);
+    .eq("empresa_id", input.empresa_id);
 
   if (input.sucursal_id) {
     ventasQuery = ventasQuery.eq(
@@ -448,6 +450,18 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   }
 
   for (const producto of resumenProductos || []) {
+    const perteneceAlPeriodo =
+      input.periodo_ids.includes(
+        String(producto.periodo_id || "")
+      ) ||
+      periodosSeleccionados.has(
+        `${Number(producto.periodo_anio)}-${Number(
+          producto.periodo_mes
+        )}`
+      );
+
+    if (!perteneceAlPeriodo) continue;
+
     const turno =
       producto.turno === "noche" ? "noche" : "mediodia";
     const nombre = nombreProductoBase(
@@ -504,6 +518,17 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
           ? facturacionProductos /
             porTurno[turno].pedidos
           : 0;
+    }
+
+    if (
+      porTurno[turno].pedidos <= 0 &&
+      porTurno[turno].pedidos_detalle > 0
+    ) {
+      porTurno[turno].pedidos =
+        porTurno[turno].pedidos_detalle;
+      porTurno[turno].ticket_promedio =
+        porTurno[turno].facturacion /
+        porTurno[turno].pedidos;
     }
 
     porTurno[turno].productos_sin_costo =

@@ -536,7 +536,31 @@ async function cargarProductosParadise(
   const { data, error } = await query;
   if (error) throw error;
 
-  return data || [];
+  const agrupados = new Map<string, any>();
+
+  for (const producto of data || []) {
+    const clave =
+      String(producto.codigo_producto || "").trim() ||
+      normalizar(producto.nombre_producto);
+    const existente = agrupados.get(clave);
+
+    if (existente) {
+      existente.cantidad =
+        Number(existente.cantidad || 0) +
+        Number(producto.cantidad || 0);
+      existente.ventas =
+        Number(existente.ventas || 0) +
+        Number(producto.ventas || 0);
+    } else {
+      agrupados.set(clave, {
+        ...producto,
+        cantidad: Number(producto.cantidad || 0),
+        ventas: Number(producto.ventas || 0),
+      });
+    }
+  }
+
+  return Array.from(agrupados.values());
 }
 
 async function cargarProductosPedidosYa(
@@ -555,7 +579,31 @@ async function cargarProductosPedidosYa(
   const { data, error } = await query;
   if (error) throw error;
 
-  return data || [];
+  const agrupados = new Map<string, any>();
+
+  for (const producto of data || []) {
+    const clave =
+      String(producto.codigo_producto || "").trim() ||
+      normalizar(producto.nombre_producto);
+    const existente = agrupados.get(clave);
+
+    if (existente) {
+      existente.cantidad =
+        Number(existente.cantidad || 0) +
+        Number(producto.cantidad || 0);
+      existente.ventas =
+        Number(existente.ventas || 0) +
+        Number(producto.ventas || 0);
+    } else {
+      agrupados.set(clave, {
+        ...producto,
+        cantidad: Number(producto.cantidad || 0),
+        ventas: Number(producto.ventas || 0),
+      });
+    }
+  }
+
+  return Array.from(agrupados.values());
 }
 
 async function cargarCostosCanalPedidosYa(

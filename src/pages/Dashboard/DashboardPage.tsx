@@ -274,7 +274,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
   forzarActualizacion = false
 ) {
   const claveCache = [
-    "dashboard-cache",
+    "dashboard-cache-v3",
     empresaId,
     periodoId,
     sucursalId || "todas",
@@ -741,6 +741,14 @@ function textoComparacion() {
   <>
     <section style={card}>
       <h3>Resultado del negocio</h3>
+
+      {resumen.pedidosya_detalle_incompleto && (
+        <p style={hint}>
+          La facturación incluye los turnos cargados. La
+          ganancia, comisión y margen son provisorios hasta
+          importar el orderDetails que falta.
+        </p>
+      )}
 
             <div style={metricGrid}>
               <Metric

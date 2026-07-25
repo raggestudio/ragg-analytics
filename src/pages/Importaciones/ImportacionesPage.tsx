@@ -164,6 +164,33 @@ export function ImportacionesPage() {
   }, [empresaId]);
 
   useEffect(() => {
+    if (!empresaId || !periodoId) return;
+
+    localStorage.setItem(
+      `importaciones-periodo-${empresaId}`,
+      periodoId
+    );
+  }, [empresaId, periodoId]);
+
+  useEffect(() => {
+    if (!empresaId || !sucursalId) return;
+
+    localStorage.setItem(
+      `importaciones-sucursal-${empresaId}`,
+      sucursalId
+    );
+  }, [empresaId, sucursalId]);
+
+  useEffect(() => {
+    if (!empresaId || !tipoImportacion) return;
+
+    localStorage.setItem(
+      `importaciones-tipo-${empresaId}`,
+      tipoImportacion
+    );
+  }, [empresaId, tipoImportacion]);
+
+  useEffect(() => {
     if (empresaId && periodoId && sucursalId) {
       cargarRentabilidad();
     }
@@ -187,40 +214,67 @@ export function ImportacionesPage() {
         ) || data[0];
 
       setEmpresaId(empresaSeleccionada.id);
-      setTipoImportacion(
-        empresaSeleccionada.tipo_negocio ===
-          "restaurante"
-          ? "pedidosya_csv"
-          : "pedidosya_csv"
-      );
       await cargarDatosEmpresa(
-        empresaSeleccionada.id
+        empresaSeleccionada.id,
+        empresaSeleccionada.tipo_negocio
       );
     }
   }
 
-  async function cargarDatosEmpresa(id: string) {
+  async function cargarDatosEmpresa(
+    id: string,
+    tipoNegocio?: string | null
+  ) {
     const [sucursalesData, periodosData] = await Promise.all([
       obtenerSucursalesPorEmpresa(id),
       obtenerPeriodosPorEmpresa(id),
     ]);
 
+    const opciones =
+      tipoNegocio === "restaurante"
+        ? OPCIONES_RESTAURANTE
+        : OPCIONES_HELADERIA;
+
+    const tipoGuardado = localStorage.getItem(
+      `importaciones-tipo-${id}`
+    ) as TipoImportacion | null;
+
+    const periodoGuardado = localStorage.getItem(
+      `importaciones-periodo-${id}`
+    );
+
+    const sucursalGuardada = localStorage.getItem(
+      `importaciones-sucursal-${id}`
+    );
+
     setSucursales(sucursalesData);
     setPeriodos(periodosData);
-    setSucursalId(sucursalesData[0]?.id || "");
-    setPeriodoId(obtenerPeriodoPredeterminado(periodosData));
+    setTipoImportacion(
+      opciones.some((opcion) => opcion.value === tipoGuardado)
+        ? (tipoGuardado as TipoImportacion)
+        : opciones[0]?.value || "pedidosya_csv"
+    );
+    setSucursalId(
+      sucursalesData.some(
+        (sucursal) => sucursal.id === sucursalGuardada
+      )
+        ? sucursalGuardada || ""
+        : sucursalesData[0]?.id || ""
+    );
+    setPeriodoId(
+      periodosData.some(
+        (periodo) => periodo.id === periodoGuardado
+      )
+        ? periodoGuardado || ""
+        : obtenerPeriodoPredeterminado(periodosData)
+    );
     await cargarImportaciones(id);
   }
 
   async function cambiarEmpresa(id: string) {
     setEmpresaId(id);
     const empresa = empresas.find((item) => item.id === id);
-    setTipoImportacion(
-      empresa?.tipo_negocio === "restaurante"
-        ? "pedidosya_csv"
-        : "pedidosya_csv"
-    );
-    await cargarDatosEmpresa(id);
+    await cargarDatosEmpresa(id, empresa?.tipo_negocio);
   }
 
   async function cargarImportaciones(id: string) {
@@ -934,7 +988,7 @@ export function ImportacionesPage() {
             <strong>Producto</strong>
             <strong>Venta</strong>
             <strong>Costo</strong>
-            <strong>Canal</strong>
+            <strong>Comisión/canal</strong>
             <strong>Margen</strong>
             <strong>%</strong>
           </div>

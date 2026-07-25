@@ -58,6 +58,35 @@ function nombreProductoBase(texto: unknown) {
     .trim();
 }
 
+function separarProductosCombinados(
+  texto: unknown,
+  cantidadOriginal: number
+) {
+  return String(texto || "Sin nombre")
+    .split(/,\s*(?=\d+\s+)/)
+    .map((parte) => {
+      const limpia = parte.trim();
+      const matchCantidad = limpia.match(
+        /^(\d+(?:[.,]\d+)?)\s*(?:[xX×]\s*)?(.+)$/
+      );
+
+      if (matchCantidad) {
+        return {
+          nombre: nombreProductoBase(matchCantidad[2]),
+          cantidad:
+            cantidadOriginal *
+            (Number(matchCantidad[1].replace(",", ".")) || 1),
+        };
+      }
+
+      return {
+        nombre: nombreProductoBase(limpia),
+        cantidad: cantidadOriginal,
+      };
+    })
+    .filter((producto) => producto.nombre);
+}
+
 function palabras(texto: string) {
   return normalizar(texto)
     .split(" ")
@@ -349,51 +378,56 @@ export default function VinculacionesRestaurante({
       }
 
       for (const fila of productosOrderDetailsResponse.data || []) {
-        const nombre = nombreProductoBase(
-          fila.nombre_producto
+        const productosSeparados = separarProductosCombinados(
+          fila.nombre_producto,
+          Number(fila.cantidad || 0)
         );
-        const nombreNormalizado = normalizar(nombre);
 
-        if (!nombreNormalizado) continue;
-        if (costosDirectos.has(nombreNormalizado)) continue;
-        if (nombresVinculados.has(nombreNormalizado)) continue;
+        for (const productoSeparado of productosSeparados) {
+          const nombre = productoSeparado.nombre;
+          const nombreNormalizado = normalizar(nombre);
 
-        const codigo = `nombre:${nombreNormalizado}`;
-        const claveProducto = `pedidosya__${codigo}`;
-        const existente = agrupados.get(claveProducto);
-        const contexto: ContextoPeriodo = {
-          periodo_id: fila.periodo_id,
-          sucursal_id: fila.sucursal_id || null,
-        };
+          if (!nombreNormalizado) continue;
+          if (costosDirectos.has(nombreNormalizado)) continue;
+          if (nombresVinculados.has(nombreNormalizado)) continue;
 
-        if (existente) {
-          existente.cantidad += Number(fila.cantidad || 0);
+          const codigo = `nombre:${nombreNormalizado}`;
+          const claveProducto = `pedidosya__${codigo}`;
+          const existente = agrupados.get(claveProducto);
+          const contexto: ContextoPeriodo = {
+            periodo_id: fila.periodo_id,
+            sucursal_id: fila.sucursal_id || null,
+          };
 
-          const contextoExiste = existente.contextos.some(
-            (item) =>
-              item.periodo_id === contexto.periodo_id &&
-              item.sucursal_id === contexto.sucursal_id
-          );
+          if (existente) {
+            existente.cantidad += productoSeparado.cantidad;
 
-          if (!contextoExiste) {
-            existente.contextos.push(contexto);
+            const contextoExiste = existente.contextos.some(
+              (item) =>
+                item.periodo_id === contexto.periodo_id &&
+                item.sucursal_id === contexto.sucursal_id
+            );
+
+            if (!contextoExiste) {
+              existente.contextos.push(contexto);
+            }
+          } else {
+            agrupados.set(claveProducto, {
+              clave: claveProducto,
+              sistema: "pedidosya",
+              codigo_producto: codigo,
+              nombre_producto: nombre,
+              categoria: null,
+              cantidad: productoSeparado.cantidad,
+              /*
+               * orderDetails no informa la venta por producto.
+               * Se deja en cero; el objetivo de esta fila es permitir
+               * completar el costo que falta en el cálculo por turno.
+               */
+              ventas: 0,
+              contextos: [contexto],
+            });
           }
-        } else {
-          agrupados.set(claveProducto, {
-            clave: claveProducto,
-            sistema: "pedidosya",
-            codigo_producto: codigo,
-            nombre_producto: nombre,
-            categoria: null,
-            cantidad: Number(fila.cantidad || 0),
-            /*
-             * orderDetails no informa la venta por producto.
-             * Se deja en cero; el objetivo de esta fila es permitir
-             * completar el costo que falta en el cálculo por turno.
-             */
-            ventas: 0,
-            contextos: [contexto],
-          });
         }
       }
 

@@ -59,6 +59,36 @@ function nombreProductoBase(texto: unknown) {
     .trim();
 }
 
+function separarProductosCombinados(
+  texto: unknown,
+  cantidadOriginal: number
+) {
+  return String(texto || "Sin nombre")
+    .split(/,\s*(?=\d+\s+)/)
+    .map((parte, index) => {
+      const limpia = parte.trim();
+      const matchCantidad = limpia.match(
+        /^(\d+(?:[.,]\d+)?)\s*(?:[xX×]\s*)?(.+)$/
+      );
+
+      if (matchCantidad) {
+        return {
+          nombre: nombreProductoBase(matchCantidad[2]),
+          cantidad:
+            cantidadOriginal *
+            (Number(matchCantidad[1].replace(",", ".")) || 1),
+        };
+      }
+
+      return {
+        nombre: nombreProductoBase(limpia),
+        cantidad:
+          index === 0 ? cantidadOriginal : cantidadOriginal,
+      };
+    })
+    .filter((producto) => producto.nombre);
+}
+
 function pedidoContabilizable(estado: unknown) {
   const valor = normalizar(estado);
   if (!valor) return true;
@@ -435,25 +465,30 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   for (const producto of productos || []) {
     const turno =
       producto.turno === "noche" ? "noche" : "mediodia";
-    const nombre = nombreProductoBase(
-      producto.nombre_producto
+
+    const productosSeparados = separarProductosCombinados(
+      producto.nombre_producto,
+      Number(producto.cantidad || 0)
     );
-    const clave = normalizar(nombre);
-    const cantidad = Number(producto.cantidad || 0);
-    const costoUnitario =
-      costoVinculado.get(clave) ??
-      costoPorNombre.get(clave);
 
-    if (
-      costoUnitario === undefined ||
-      costoUnitario <= 0
-    ) {
-      sinCostoPorTurno[turno].add(nombre);
-      continue;
+    for (const productoSeparado of productosSeparados) {
+      const nombre = productoSeparado.nombre;
+      const clave = normalizar(nombre);
+      const costoUnitario =
+        costoVinculado.get(clave) ??
+        costoPorNombre.get(clave);
+
+      if (
+        costoUnitario === undefined ||
+        costoUnitario <= 0
+      ) {
+        sinCostoPorTurno[turno].add(nombre);
+        continue;
+      }
+
+      porTurno[turno].costo_productos +=
+        costoUnitario * productoSeparado.cantidad;
     }
-
-    porTurno[turno].costo_productos +=
-      costoUnitario * cantidad;
   }
 
   for (const producto of resumenProductos || []) {

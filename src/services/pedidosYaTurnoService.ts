@@ -48,6 +48,15 @@ function normalizar(texto: unknown) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\(.*$/g, " ")
+    .replace(
+      /\b\d+(?:[.,]\d+)?\s*(ml|cc|gr|g|kg|lt|lts|l)\b/g,
+      " "
+    )
+    .replace(/\bbeer\s+bros\b/g, "beerbros")
+    .replace(/\bgin\s+tonic\b/g, "gintonic")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -59,12 +68,44 @@ function nombreProductoBase(texto: unknown) {
     .trim();
 }
 
+function separarNombresFueraDeCorchetes(texto: string) {
+  const partes: string[] = [];
+  let actual = "";
+  let nivelCorchetes = 0;
+
+  for (let indice = 0; indice < texto.length; indice++) {
+    const caracter = texto[indice];
+
+    if (caracter === "[") nivelCorchetes++;
+    if (caracter === "]" && nivelCorchetes > 0) {
+      nivelCorchetes--;
+    }
+
+    if (
+      caracter === "," &&
+      nivelCorchetes === 0 &&
+      /^\s*\d+\s+/.test(texto.slice(indice + 1))
+    ) {
+      if (actual.trim()) partes.push(actual.trim());
+      actual = "";
+      continue;
+    }
+
+    actual += caracter;
+  }
+
+  if (actual.trim()) partes.push(actual.trim());
+
+  return partes;
+}
+
 function separarProductosCombinados(
   texto: unknown,
   cantidadOriginal: number
 ) {
-  return String(texto || "Sin nombre")
-    .split(/,\s*(?=\d+\s+)/)
+  return separarNombresFueraDeCorchetes(
+    String(texto || "Sin nombre")
+  )
     .map((parte, index) => {
       const limpia = parte.trim();
       const matchCantidad = limpia.match(

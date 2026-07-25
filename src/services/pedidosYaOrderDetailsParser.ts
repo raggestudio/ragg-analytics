@@ -121,18 +121,41 @@ function fechaIso(valor: string): string | null {
     : fecha.toISOString();
 }
 
+function separarProductosFueraDeCorchetes(texto: string) {
+  const partes: string[] = [];
+  let actual = "";
+  let nivelCorchetes = 0;
+
+  for (let indice = 0; indice < texto.length; indice++) {
+    const caracter = texto[indice];
+
+    if (caracter === "[") nivelCorchetes++;
+    if (caracter === "]" && nivelCorchetes > 0) {
+      nivelCorchetes--;
+    }
+
+    if (
+      caracter === "," &&
+      nivelCorchetes === 0 &&
+      /^\s*\d+\s+/.test(texto.slice(indice + 1))
+    ) {
+      if (actual.trim()) partes.push(actual.trim());
+      actual = "";
+      continue;
+    }
+
+    actual += caracter;
+  }
+
+  if (actual.trim()) partes.push(actual.trim());
+
+  return partes;
+}
+
 function parsearArticulos(texto: string) {
   const lineas = String(texto || "")
-    /*
-     * PedidosYa separa los productos con coma:
-     * "1 Sopa del día, 1 Milanesa de carne [1 Puré de papa]".
-     *
-     * Solamente cortamos una coma cuando después comienza otra
-     * cantidad entera, para no romper nombres que puedan contenerla.
-     */
-    .split(
-      /\r?\n|\s*\|\s*|\s*;\s*|,\s*(?=\d+\s+)/
-    )
+    .split(/\r?\n|\s*\|\s*|\s*;\s*/)
+    .flatMap(separarProductosFueraDeCorchetes)
     .map((linea) => linea.trim())
     .filter(Boolean);
 

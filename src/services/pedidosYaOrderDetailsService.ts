@@ -107,6 +107,16 @@ export async function reemplazarOrderDetailsPedidosYa(
 ) {
   const turno = input.turno || "general";
   /*
+   * Las primeras importaciones de Duna se guardaron como "general".
+   * Al volver a importar el mediodía también reemplazamos esos datos
+   * antiguos, para que no queden duplicados ni se sumen dos veces.
+   */
+  const turnosAReemplazar =
+    turno === "mediodia"
+      ? ["mediodia", "general"]
+      : [turno];
+
+  /*
    * Primero buscamos y eliminamos todos los pedidos
    * correspondientes exclusivamente al período y sucursal.
    */
@@ -115,7 +125,7 @@ export async function reemplazarOrderDetailsPedidosYa(
     .select("id")
     .eq("empresa_id", input.empresa_id)
     .eq("periodo_id", input.periodo_id)
-    .eq("turno", turno);
+    .in("turno", turnosAReemplazar);
 
   if (input.sucursal_id) {
     buscarQuery = buscarQuery.eq(
@@ -146,7 +156,7 @@ export async function reemplazarOrderDetailsPedidosYa(
     .delete()
     .eq("empresa_id", input.empresa_id)
     .eq("periodo_id", input.periodo_id)
-    .eq("turno", turno);
+    .in("turno", turnosAReemplazar);
 
   if (input.sucursal_id) {
     deleteQuery = deleteQuery.eq(

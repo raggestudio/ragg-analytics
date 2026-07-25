@@ -123,7 +123,16 @@ function fechaIso(valor: string): string | null {
 
 function parsearArticulos(texto: string) {
   const lineas = String(texto || "")
-    .split(/\r?\n|\s*\|\s*|\s*;\s*/)
+    /*
+     * PedidosYa separa los productos con coma:
+     * "1 Sopa del día, 1 Milanesa de carne [1 Puré de papa]".
+     *
+     * Solamente cortamos una coma cuando después comienza otra
+     * cantidad entera, para no romper nombres que puedan contenerla.
+     */
+    .split(
+      /\r?\n|\s*\|\s*|\s*;\s*|,\s*(?=\d+\s+)/
+    )
     .map((linea) => linea.trim())
     .filter(Boolean);
 
@@ -135,7 +144,7 @@ function parsearArticulos(texto: string) {
 
   for (const linea of lineas) {
     const matchInicio = linea.match(
-      /^(\d+(?:[.,]\d+)?)\s*[xX×]\s*(.+)$/
+      /^(\d+(?:[.,]\d+)?)\s*(?:[xX×]\s*)?(.+)$/
     );
 
     const matchFinal = linea.match(

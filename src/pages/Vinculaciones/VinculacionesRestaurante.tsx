@@ -714,8 +714,10 @@ export default function VinculacionesRestaurante({
             </strong>
 
             <p>
-              Los productos de esta lista tienen ventas, pero
-              todavía no tienen un costo vinculado.
+              Los productos de esta lista fueron vendidos, pero
+              todavía no tienen un costo vinculado. Cuando el
+              producto proviene solamente de orderDetails, el
+              archivo no informa su precio individual.
             </p>
 
             {sugerenciasConfiables.length > 0 && (
@@ -791,27 +793,41 @@ export default function VinculacionesRestaurante({
   </div>
 
   <div style={ventasBox}>
-    <span>Precio promedio por unidad</span>
+    {producto.ventas > 0 ? (
+      <>
+        <span>Precio promedio por unidad</span>
 
-    <strong style={precioUnitario}>
-      $
-      {(
-        producto.cantidad > 0
-          ? producto.ventas / producto.cantidad
-          : 0
-      ).toLocaleString("es-UY", {
-        maximumFractionDigits: 2,
-      })}
-    </strong>
+        <strong style={precioUnitario}>
+          $
+          {(
+            producto.cantidad > 0
+              ? producto.ventas / producto.cantidad
+              : 0
+          ).toLocaleString("es-UY", {
+            maximumFractionDigits: 2,
+          })}
+        </strong>
 
-    <span>
-      {producto.cantidad.toLocaleString("es-UY")} unidades
-    </span>
+        <span>
+          {producto.cantidad.toLocaleString("es-UY")} unidades
+        </span>
 
-    <small>
-      Venta total: $
-      {producto.ventas.toLocaleString("es-UY")}
-    </small>
+        <small>
+          Venta total: $
+          {producto.ventas.toLocaleString("es-UY")}
+        </small>
+      </>
+    ) : (
+      <>
+        <span>Detectado en orderDetails</span>
+        <strong style={precioUnitario}>
+          {producto.cantidad.toLocaleString("es-UY")} unidades
+        </strong>
+        <small>
+          Precio individual no informado por el archivo
+        </small>
+      </>
+    )}
   </div>
 </div>
 
@@ -925,19 +941,21 @@ export default function VinculacionesRestaurante({
       </strong>
 
       <div style={comparacionGrid}>
-        <span>
-          Precio por unidad:
-          <strong>
-            $
-            {(
-              producto.cantidad > 0
-                ? producto.ventas / producto.cantidad
-                : 0
-            ).toLocaleString("es-UY", {
-              maximumFractionDigits: 2,
-            })}
-          </strong>
-        </span>
+        {producto.ventas > 0 && (
+          <span>
+            Precio por unidad:
+            <strong>
+              $
+              {(
+                producto.cantidad > 0
+                  ? producto.ventas / producto.cantidad
+                  : 0
+              ).toLocaleString("es-UY", {
+                maximumFractionDigits: 2,
+              })}
+            </strong>
+          </span>
+        )}
 
         <span>
           Costo por unidad:
@@ -949,37 +967,42 @@ export default function VinculacionesRestaurante({
           </strong>
         </span>
 
-        <span>
-          Margen por unidad:
-          <strong>
-            $
-            {Math.max(
-              producto.cantidad > 0
-                ? producto.ventas / producto.cantidad -
-                    Number(costoSeleccionado.costo)
-                : 0,
-              0
-            ).toLocaleString("es-UY", {
-              maximumFractionDigits: 2,
-            })}
-          </strong>
-        </span>
+        {producto.ventas > 0 && (
+          <>
+            <span>
+              Margen por unidad:
+              <strong>
+                $
+                {Math.max(
+                  producto.cantidad > 0
+                    ? producto.ventas / producto.cantidad -
+                        Number(costoSeleccionado.costo)
+                    : 0,
+                  0
+                ).toLocaleString("es-UY", {
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </span>
 
-        <span>
-          Margen estimado:
-          <strong>
-            {producto.cantidad > 0 &&
-            producto.ventas / producto.cantidad > 0
-              ? (
-                  ((producto.ventas / producto.cantidad -
-                    Number(costoSeleccionado.costo)) /
-                    (producto.ventas / producto.cantidad)) *
-                  100
-                ).toFixed(1)
-              : "0.0"}
-            %
-          </strong>
-        </span>
+            <span>
+              Margen estimado:
+              <strong>
+                {producto.cantidad > 0
+                  ? (
+                      ((producto.ventas /
+                        producto.cantidad -
+                        Number(costoSeleccionado.costo)) /
+                        (producto.ventas /
+                          producto.cantidad)) *
+                      100
+                    ).toFixed(1)
+                  : "0.0"}
+                %
+              </strong>
+            </span>
+          </>
+        )}
       </div>
     </div>
   ) : (

@@ -50,6 +50,14 @@ function normalizar(texto: string) {
     .trim();
 }
 
+function nombreProductoBase(texto: unknown) {
+  return String(texto || "Sin nombre")
+    .replace(/^\s*\d+(?:[.,]\d+)?\s*[xX×]?\s+/, "")
+    .replace(/\s*\[[^\]]*\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function palabras(texto: string) {
   return normalizar(texto)
     .split(" ")
@@ -154,6 +162,7 @@ export default function VinculacionesRestaurante({
         rentabilidadResponse,
         ventasParadiseResponse,
         ventasPedidosYaResponse,
+        productosOrderDetailsResponse,
       ] = await Promise.all([
         obtenerCostosManualesPorEmpresa(empresaId),
 
@@ -204,6 +213,18 @@ export default function VinculacionesRestaurante({
             `
           )
           .eq("empresa_id", empresaId),
+
+        supabase
+          .from("pedidosya_pedido_productos")
+          .select(
+            `
+              periodo_id,
+              sucursal_id,
+              nombre_producto,
+              cantidad
+            `
+          )
+          .eq("empresa_id", empresaId),
       ]);
 
       if (rentabilidadResponse.error) {
@@ -216,6 +237,10 @@ export default function VinculacionesRestaurante({
 
       if (ventasPedidosYaResponse.error) {
         throw ventasPedidosYaResponse.error;
+      }
+
+      if (productosOrderDetailsResponse.error) {
+        throw productosOrderDetailsResponse.error;
       }
 
       const mapaCodigo = new Map<string, string | null>();
@@ -293,6 +318,80 @@ export default function VinculacionesRestaurante({
             categoria: fila.categoria || null,
             cantidad: Number(fila.cantidad || 0),
             ventas: Number(fila.ventas || 0),
+            contextos: [contexto],
+          });
+        }
+      }
+
+      /*
+       * El dashboard calcula los costos por turno directamente desde
+       * pedidosya_pedido_productos. Por eso esta pantalla también debe
+       * revisar esa misma fuente: un producto recién importado puede no
+       * haber llegado todavía a rentabilidad_periodo y, de otro modo,
+       * figuraría "sin costo" en el dashboard pero no aparecería aquí.
+       */
+      const costosDirectos = new Set(
+        costosData.map((costo) =>
+          normalizar(costo.nombre_producto)
+        )
+      );
+
+      const nombresVinculados = new Set<string>();
+
+      for (const vinculacion of vinculacionesData) {
+        if (!vinculacion.costo_manual_id) continue;
+
+        const nombre = normalizar(
+          nombreProductoBase(vinculacion.nombre_sistema)
+        );
+
+        if (nombre) nombresVinculados.add(nombre);
+      }
+
+      for (const fila of productosOrderDetailsResponse.data || []) {
+        const nombre = nombreProductoBase(
+          fila.nombre_producto
+        );
+        const nombreNormalizado = normalizar(nombre);
+
+        if (!nombreNormalizado) continue;
+        if (costosDirectos.has(nombreNormalizado)) continue;
+        if (nombresVinculados.has(nombreNormalizado)) continue;
+
+        const codigo = `nombre:${nombreNormalizado}`;
+        const claveProducto = `pedidosya__${codigo}`;
+        const existente = agrupados.get(claveProducto);
+        const contexto: ContextoPeriodo = {
+          periodo_id: fila.periodo_id,
+          sucursal_id: fila.sucursal_id || null,
+        };
+
+        if (existente) {
+          existente.cantidad += Number(fila.cantidad || 0);
+
+          const contextoExiste = existente.contextos.some(
+            (item) =>
+              item.periodo_id === contexto.periodo_id &&
+              item.sucursal_id === contexto.sucursal_id
+          );
+
+          if (!contextoExiste) {
+            existente.contextos.push(contexto);
+          }
+        } else {
+          agrupados.set(claveProducto, {
+            clave: claveProducto,
+            sistema: "pedidosya",
+            codigo_producto: codigo,
+            nombre_producto: nombre,
+            categoria: null,
+            cantidad: Number(fila.cantidad || 0),
+            /*
+             * orderDetails no informa la venta por producto.
+             * Se deja en cero; el objetivo de esta fila es permitir
+             * completar el costo que falta en el cálculo por turno.
+             */
+            ventas: 0,
             contextos: [contexto],
           });
         }

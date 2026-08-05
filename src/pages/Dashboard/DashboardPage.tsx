@@ -280,7 +280,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
   forzarActualizacion = false
 ) {
   const claveCache = [
-    "dashboard-cache-v6",
+    "dashboard-cache-v7",
     empresaId,
     periodoId,
     sucursalId || "todas",

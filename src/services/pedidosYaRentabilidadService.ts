@@ -128,7 +128,9 @@ for (const sabor of saboresBase) {
   const clave =
     nombreNormalizado === "limon natural"
       ? "limon"
-      : nombreNormalizado;
+      : nombreNormalizado === "frutilla natural"
+        ? "frutilla"
+        : nombreNormalizado;
 
   const existente = saboresUnificados.get(clave);
 
@@ -139,7 +141,12 @@ for (const sabor of saboresBase) {
   } else {
     saboresUnificados.set(clave, {
       ...sabor,
-      sabor: clave === "limon" ? "Limón" : sabor.sabor,
+      sabor:
+        clave === "limon"
+          ? "Limón"
+          : clave === "frutilla"
+            ? "Frutilla Dietética"
+            : sabor.sabor,
       sabor_normalizado: clave,
       cantidad: Number(sabor.cantidad || 0),
     });

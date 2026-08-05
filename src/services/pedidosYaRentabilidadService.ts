@@ -46,6 +46,23 @@ function normalizar(texto: string) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+function normalizarConTipo(texto: string) {
+  return String(texto || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[()[\]{}.,;:_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const aliasRecetasExactos: Record<string, string> = {
+  "frutilla dietetica": "frutilla diet",
+  "frutilla natural dietetica": "frutilla diet",
+  "imperial de frutilla dietetica": "frutilla imperial diet",
+  "frutilla imperial dietetica": "frutilla imperial diet",
+};
 const aliasRecetas: Record<string, string> = {
   "limon natural": "limon",
   limon: "limon",
@@ -68,6 +85,17 @@ function buscarReceta(
     costo_kg: number | null;
   }>
 ) {
+  const saborConTipo = normalizarConTipo(sabor);
+  const aliasExacto = aliasRecetasExactos[saborConTipo];
+
+  if (aliasExacto) {
+    const recetaExacta = recetas.find(
+      (receta) => normalizarConTipo(receta.nombre) === aliasExacto
+    );
+
+    if (recetaExacta) return recetaExacta;
+  }
+
   const saborNormalizado = normalizar(sabor);
 
   const nombreBuscado =

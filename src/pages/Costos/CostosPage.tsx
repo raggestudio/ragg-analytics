@@ -8,6 +8,9 @@ import {
   obtenerRecetasPorEmpresa,
 } from "../../services/costosService";
 import type { Insumo, Receta } from "../../types/costos";
+
+const CLAVE_EMPRESA_COSTOS = "costos-empresa-seleccionada";
+
 export function CostosPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaId, setEmpresaId] = useState("");
@@ -26,8 +29,18 @@ export function CostosPage() {
     setEmpresas(empresasData);
 
     if (empresasData.length > 0) {
-      setEmpresaId(empresasData[0].id);
-      await cargarDatos(empresasData[0].id);
+      const empresaGuardada = localStorage.getItem(
+        CLAVE_EMPRESA_COSTOS
+      );
+      const empresaInicial = empresasData.some(
+        (empresa) => empresa.id === empresaGuardada
+      )
+        ? String(empresaGuardada)
+        : empresasData[0].id;
+
+      setEmpresaId(empresaInicial);
+      localStorage.setItem(CLAVE_EMPRESA_COSTOS, empresaInicial);
+      await cargarDatos(empresaInicial);
     }
   }
 
@@ -38,6 +51,7 @@ export function CostosPage() {
 
   async function cambiarEmpresa(id: string) {
     setEmpresaId(id);
+    localStorage.setItem(CLAVE_EMPRESA_COSTOS, id);
     await cargarDatos(id);
   }
 

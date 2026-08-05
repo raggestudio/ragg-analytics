@@ -28,6 +28,24 @@ export type SaborPedidosYa = {
   updated_at: string;
 };
 
+function claveCanonicaSabor(sabor: string) {
+  const normalizado = String(sabor || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (
+    normalizado === "frutilla dietetica" ||
+    normalizado === "frutilla natural dietetica"
+  ) {
+    return "frutilla dietetica";
+  }
+
+  return normalizado;
+}
+
 export async function reemplazarResumenSaboresPedidosYa(
   input: GuardarSaboresPedidosYaInput
 ) {
@@ -142,13 +160,21 @@ export function agruparSaboresPedidosYa(
   const acumulado = new Map<string, SaborPedidosYa>();
 
   for (const fila of filas) {
-    const existente = acumulado.get(fila.sabor_normalizado);
+    const clave = claveCanonicaSabor(
+      fila.sabor_normalizado || fila.sabor
+    );
+    const existente = acumulado.get(clave);
 
     if (existente) {
       existente.cantidad += Number(fila.cantidad || 0);
     } else {
-      acumulado.set(fila.sabor_normalizado, {
+      acumulado.set(clave, {
         ...fila,
+        sabor:
+          clave === "frutilla dietetica"
+            ? "Frutilla Dietética"
+            : fila.sabor,
+        sabor_normalizado: clave,
         cantidad: Number(fila.cantidad || 0),
       });
     }

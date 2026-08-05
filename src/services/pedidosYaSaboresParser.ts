@@ -121,9 +121,11 @@ function extraerSaboresDeArticulos(articulos: string) {
       const sabor = nombreVisible(match[2]);
       const saborNormalizado = normalizarTexto(sabor);
       const saborAgrupado =
-  saborNormalizado === "limon natural"
-    ? "limon"
-    : saborNormalizado;
+        saborNormalizado === "limon natural"
+          ? "limon"
+          : saborNormalizado === "frutilla natural dietetica"
+            ? "frutilla dietetica"
+            : saborNormalizado;
 
       if (!saborNormalizado || cantidad <= 0) continue;
 

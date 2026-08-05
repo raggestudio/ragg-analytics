@@ -995,7 +995,11 @@ export function ImportacionesPage() {
 
           {rentabilidad.map((item) => (
             <div key={item.id} style={tableRow}>
-              <span>{item.canal || "Paradise"}</span>
+              <span>
+                {esRestaurante()
+                  ? item.canal || "Paradise"
+                  : "Isatech"}
+              </span>
               <span>{item.nombre_producto}</span>
               <span>{moneda(item.ventas)}</span>
               <span>{moneda(item.costo_total)}</span>

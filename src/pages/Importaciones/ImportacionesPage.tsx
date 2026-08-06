@@ -52,6 +52,13 @@ import type { Empresa } from "../../types/empresa";
 import type { Sucursal } from "../../types/sucursal";
 import type { Periodo } from "../../types/periodo";
 import type { Importacion } from "../../types/importacion";
+import {
+  leerHistoricoNoFacturadoBerlin,
+  leerInfoClubBerlin,
+} from "../../services/berlinExcelParsers";
+import { reemplazarVentasBerlin } from "../../services/berlinService";
+
+const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
 type TipoImportacion =
   | "pedidosya_csv"
@@ -65,7 +72,13 @@ type TipoImportacion =
   | "paradise_pdf"
   | "produccion_excel"
   | "costos_excel"
-  | "costos_duna_excel";
+  | "costos_duna_excel"
+  | "berlin_infoclub_excel"
+  | "berlin_historico_no_excel"
+  | "berlin_costos_excel"
+  | "berlin_ocr_salon"
+  | "berlin_ocr_delivery"
+  | "berlin_ocr_takeaway";
 
 type OpcionImportacion = {
   value: TipoImportacion;
@@ -111,6 +124,15 @@ const OPCIONES_RESTAURANTE: OpcionImportacion[] = [
     value: "costos_duna_excel",
     label: "Costos Duna Excel",
   },
+];
+
+const OPCIONES_BERLIN: OpcionImportacion[] = [
+  { value: "berlin_infoclub_excel", label: "InfoClub Excel · Salón" },
+  { value: "berlin_historico_no_excel", label: "Histórico Facturado = NO · Junio" },
+  { value: "berlin_costos_excel", label: "Costos Berlín Excel" },
+  { value: "berlin_ocr_salon", label: "Comprobantes OCR · Salón (próximamente)" },
+  { value: "berlin_ocr_delivery", label: "Comprobantes OCR · Delivery (próximamente)" },
+  { value: "berlin_ocr_takeaway", label: "Comprobantes OCR · Take away (próximamente)" },
 ];
 
 type RentabilidadConCanal = RentabilidadProducto & {
@@ -231,7 +253,9 @@ export function ImportacionesPage() {
     ]);
 
     const opciones =
-      tipoNegocio === "restaurante"
+      id === BERLIN_EMPRESA_ID
+        ? OPCIONES_BERLIN
+        : tipoNegocio === "restaurante"
         ? OPCIONES_RESTAURANTE
         : OPCIONES_HELADERIA;
 
@@ -307,8 +331,15 @@ export function ImportacionesPage() {
     return empresaActual()?.tipo_negocio === "restaurante";
   }
 
+  function esBerlin() {
+    const nombre = empresaActual()?.nombre.toLowerCase() || "";
+    return empresaId === BERLIN_EMPRESA_ID || nombre.includes("berlín") || nombre.includes("berlin");
+  }
+
   function opcionesImportacion() {
-    return esRestaurante()
+    return esBerlin()
+      ? OPCIONES_BERLIN
+      : esRestaurante()
       ? OPCIONES_RESTAURANTE
       : OPCIONES_HELADERIA;
   }
@@ -336,7 +367,7 @@ export function ImportacionesPage() {
   }
 
   function requiereSucursal() {
-    return !["produccion_excel", "costos_excel", "costos_duna_excel"].includes(
+    return !["produccion_excel", "costos_excel", "costos_duna_excel", "berlin_costos_excel"].includes(
       tipoImportacion
     );
   }
@@ -452,6 +483,55 @@ export function ImportacionesPage() {
       }
 
       setMensaje("Procesando archivo...");
+
+      if (
+        tipoImportacion === "berlin_ocr_salon" ||
+        tipoImportacion === "berlin_ocr_delivery" ||
+        tipoImportacion === "berlin_ocr_takeaway"
+      ) {
+        throw new Error(
+          "La carga OCR por modalidad ya está prevista, pero se habilitará al conectar el lector. Para junio usá el histórico Facturado = NO."
+        );
+      }
+
+      if (
+        tipoImportacion === "berlin_infoclub_excel" ||
+        tipoImportacion === "berlin_historico_no_excel"
+      ) {
+        const ventasLeidas = tipoImportacion === "berlin_infoclub_excel"
+          ? await leerInfoClubBerlin(archivo)
+          : await leerHistoricoNoFacturadoBerlin(archivo);
+        const ventas = ventasLeidas.filter((venta) => {
+          if (!venta.fecha) return false;
+          const fecha = new Date(venta.fecha);
+          return fecha.getFullYear() === Number(periodo.anio) &&
+            fecha.getMonth() + 1 === Number(periodo.mes);
+        });
+        if (!ventas.length) {
+          throw new Error(`El archivo no contiene ventas de ${periodo.nombre}.`);
+        }
+        const resultado = await reemplazarVentasBerlin({
+          empresa_id: empresaId,
+          sucursal_id: sucursalId || null,
+          periodo_id: periodo.id,
+          periodo_anio: periodo.anio,
+          periodo_mes: periodo.mes,
+          fuente: tipoImportacion === "berlin_infoclub_excel" ? "infoclub" : "historico_no",
+          ventas,
+        });
+        await registrarImportacion({ archivo, registros: resultado.importados });
+        setMensaje(
+          `${tipoImportacion === "berlin_infoclub_excel" ? "InfoClub" : "Histórico interno"} importado: ` +
+          `${resultado.importados} líneas y ${moneda(resultado.ventas)}. La carga anterior de esta fuente y período fue reemplazada.`
+        );
+      }
+
+      if (tipoImportacion === "berlin_costos_excel") {
+        const resultado = await parsearExcelCostosDuna(archivo);
+        const importacion = await importarCostosManualesDuna({ empresa_id: empresaId, data: resultado });
+        await registrarImportacion({ archivo, registros: importacion.importados, usaSucursal: false });
+        setMensaje(`Costos Berlín importados: ${importacion.importados} productos.`);
+      }
 
       if (
         tipoImportacion === "pedidosya_csv" ||
@@ -871,7 +951,7 @@ export function ImportacionesPage() {
         <input
           style={input}
           type="file"
-          accept=".csv,.pdf,.xlsx,.xls"
+          accept=".csv,.pdf,.xlsx,.xls,.xltx,.jpg,.jpeg,.png,.webp"
           onChange={subirArchivo}
         />
 
@@ -884,7 +964,14 @@ export function ImportacionesPage() {
           <strong>{periodoActual()?.nombre || "Sin período"}</strong>
         </p>
 
-        {esRestaurante() ? (
+        {esBerlin() ? (
+          <>
+            <EstadoItem label="InfoClub · Salón" tipo="berlin_infoclub_excel" usaSucursal />
+            <EstadoItem label="Histórico interno · Facturado NO" tipo="berlin_historico_no_excel" usaSucursal />
+            <EstadoItem label="Costos Berlín" tipo="berlin_costos_excel" usaSucursal={false} />
+            <p style={hint}>OCR preparado en tres lotes separados: Salón, Delivery y Take away.</p>
+          </>
+        ) : esRestaurante() ? (
           <>
             <EstadoItem
               label="PedidosYa mediodía - productos"

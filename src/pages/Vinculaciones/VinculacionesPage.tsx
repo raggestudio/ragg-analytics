@@ -3,10 +3,13 @@ import { obtenerEmpresas } from "../../services/empresaService";
 import type { Empresa } from "../../types/empresa";
 import VinculacionesHeladeria from "./VinculacionesHeladeria";
 import VinculacionesRestaurante from "./VinculacionesRestaurante";
+import VinculacionesBerlin from "./VinculacionesBerlin";
+
+const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
 export function VinculacionesPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [empresaId, setEmpresaId] = useState("");
+  const [empresaId, setEmpresaId] = useState(() => localStorage.getItem("vinculaciones-empresa-seleccionada") || "");
   const [tipoNegocio, setTipoNegocio] = useState<
     "heladeria" | "restaurante"
   >("heladeria");
@@ -22,7 +25,7 @@ export function VinculacionesPage() {
 
     if (empresasData.length === 0) return;
 
-    const primeraEmpresa = empresasData[0];
+    const primeraEmpresa = empresasData.find((e) => e.id === empresaId) || empresasData[0];
 
     setEmpresaId(primeraEmpresa.id);
 
@@ -34,6 +37,7 @@ export function VinculacionesPage() {
   }
 
   function cambiarEmpresa(id: string) {
+    localStorage.setItem("vinculaciones-empresa-seleccionada", id);
     setEmpresaId(id);
 
     const empresaSeleccionada = empresas.find(
@@ -69,7 +73,9 @@ export function VinculacionesPage() {
         </select>
       </section>
 
-      {tipoNegocio === "restaurante" ? (
+      {empresaId === BERLIN_EMPRESA_ID ? (
+        <VinculacionesBerlin empresaId={empresaId} />
+      ) : tipoNegocio === "restaurante" ? (
         <VinculacionesRestaurante empresaId={empresaId} />
       ) : (
         <VinculacionesHeladeria empresaId={empresaId} />

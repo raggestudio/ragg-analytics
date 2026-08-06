@@ -38,6 +38,9 @@ import {
   type ResumenPedidosYaPorTurno,
   type VistaTurnoPedidosYa,
 } from "../../services/pedidosYaTurnoService";
+import BerlinDashboard from "../../components/dashboard/BerlinDashboard";
+
+const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
 function obtenerPeriodoPredeterminado(periodos: Periodo[]) {
   const hoy = new Date();
@@ -562,6 +565,48 @@ function textoComparacion() {
   const anterior = comparativo?.anterior || null;
   const resumenTurnoActual =
     resumenTurnos?.[vistaTurno] || null;
+
+  if (empresaActual?.id === BERLIN_EMPRESA_ID) {
+    return (
+      <div>
+        <div style={titleRow}>
+          <h2 style={title}>Dashboard Ejecutivo · Berlín</h2>
+          <button type="button" style={pdfButton} onClick={() => window.print()}>Exportar PDF</button>
+        </div>
+        <section style={card}>
+          <h3>Vista</h3>
+          <div style={filtersGrid} className="no-print">
+            <div><label style={label}>Tipo de análisis</label>
+              <select style={input} value={modoAnalisis} onChange={(e) => setModoAnalisis(e.target.value as typeof modoAnalisis)}>
+                <option value="mensual">Mensual</option><option value="trimestral">Trimestral</option>
+                <option value="anual">Anual</option><option value="personalizado">Personalizado</option>
+              </select>
+            </div>
+            <div><label style={label}>Empresa</label>
+              <select style={input} value={empresaId} onChange={(e) => cambiarEmpresa(e.target.value)}>
+                {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
+              </select>
+            </div>
+            {modoAnalisis === "personalizado" ? <>
+              <div><label style={label}>Desde</label><select style={input} value={periodoDesdeId} onChange={(e) => setPeriodoDesdeId(e.target.value)}>
+                {periodos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select></div>
+              <div><label style={label}>Hasta</label><select style={input} value={periodoHastaId} onChange={(e) => setPeriodoHastaId(e.target.value)}>
+                {periodos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select></div>
+            </> : <div><label style={label}>Período</label><select style={input} value={periodoId} onChange={(e) => setPeriodoId(e.target.value)}>
+              {periodos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select></div>}
+            <div><label style={label}>Sucursal</label><select style={input} value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
+              <option value="">Todas</option>{sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select></div>
+          </div>
+          <p style={hint}>Mostrando {tituloVista()} · {sucursalActual?.nombre || "Todas las sucursales"}</p>
+        </section>
+        <BerlinDashboard empresaId={empresaId} periodoIds={obtenerPeriodoIdsSeleccionados()} sucursalId={sucursalId || null} />
+      </div>
+    );
+  }
 
   return (
     <div>

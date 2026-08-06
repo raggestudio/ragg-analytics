@@ -114,6 +114,7 @@ export async function parsearExcelCostosDuna(
     const productoIndex = encabezados.findIndex(
       (valor) =>
         valor === "producto" ||
+        valor === "productos" ||
         valor === "nombre" ||
         valor === "articulo"
     );
@@ -121,6 +122,8 @@ export async function parsearExcelCostosDuna(
     const costoIndex = encabezados.findIndex(
       (valor) =>
         valor === "costo" ||
+        valor === "costos x unidad" ||
+        valor === "costo x unidad" ||
         valor === "costo unitario" ||
         valor === "costo por unidad"
     );

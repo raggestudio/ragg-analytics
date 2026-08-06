@@ -131,8 +131,10 @@ export function normalizarProductoBerlin(value: string) {
   const alias: Record<string, string> = {
     "refrescos linea coca cola 350ml": "refrescos linea coca",
     "refrescos linea coca": "refrescos linea coca",
+    "agua vitale con": "agua vitale con y sin gas 600ml",
     "agua vitale con y": "agua vitale con y sin gas 600ml",
     "agua vitale con y sin gas 600ml": "agua vitale con y sin gas 600ml",
+    "crumble manzana": "crumble de manzana",
     "crumble de manzana": "crumble de manzana",
   };
 

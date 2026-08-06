@@ -16,6 +16,7 @@ type Perfil = {
   usuario_id: string;
   nombre: string | null;
   rol: RolUsuario;
+  permisos?: string[] | null;
 };
 
 type AuthContextValue = {
@@ -25,6 +26,7 @@ type AuthContextValue = {
   cargando: boolean;
   esAdmin: boolean;
   soloLectura: boolean;
+  tienePermiso: (seccion: string) => boolean;
   iniciarSesion: (email: string, password: string) => Promise<void>;
   cerrarSesion: () => Promise<void>;
 };
@@ -53,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error } = await supabase
         .from("perfiles")
-        .select("usuario_id, nombre, rol")
+        .select("*")
         .eq("usuario_id", sesion.user.id)
         .single();
 
@@ -105,6 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cargando,
       esAdmin: perfil?.rol === "admin",
       soloLectura: perfil?.rol !== "admin",
+      tienePermiso(seccion) {
+        if (perfil?.rol === "admin") return true;
+        if (!perfil?.permisos) return true;
+        return perfil.permisos.includes(seccion);
+      },
       async iniciarSesion(email, password) {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),

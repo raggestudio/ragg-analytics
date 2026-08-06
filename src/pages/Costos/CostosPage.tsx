@@ -9,10 +9,12 @@ import {
 } from "../../services/costosService";
 import type { Insumo, Receta } from "../../types/costos";
 import CostosBerlin from "./CostosBerlin";
+import { useAuth } from "../../contexts/AuthContext";
 
 const CLAVE_EMPRESA_COSTOS = "costos-empresa-seleccionada";
 
 export function CostosPage() {
+  const { soloLectura } = useAuth();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaId, setEmpresaId] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -109,7 +111,7 @@ export function CostosPage() {
     <div>
       <h2>Costos</h2>
 
-      <section style={card}>
+      {!soloLectura && <section style={card}>
         <h3>Importar Excel de costos</h3>
 
         <select
@@ -132,9 +134,9 @@ export function CostosPage() {
         />
 
         {mensaje && <p>{mensaje}</p>}
-      </section>
+      </section>}
 
-      {esBerlin ? <CostosBerlin empresaId={empresaId} /> : <>
+      {esBerlin ? <CostosBerlin empresaId={empresaId} soloLectura={soloLectura} /> : <>
 
       <section style={card}>
         <h3>Resumen</h3>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { obtenerCostosManualesPorEmpresa, importarCostosManualesDuna, type CostoProductoManual } from "../../services/costosManualService";
 import { parsearExcelCostosDuna } from "../../services/excelCostosDunaParser";
 
-export default function CostosBerlin({ empresaId }: { empresaId: string }) {
+export default function CostosBerlin({ empresaId, soloLectura = false }: { empresaId: string; soloLectura?: boolean }) {
   const [costos, setCostos] = useState<CostoProductoManual[]>([]);
   const [buscar, setBuscar] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -38,7 +38,7 @@ export default function CostosBerlin({ empresaId }: { empresaId: string }) {
     <section style={card}>
       <h3>Costos de productos · Berlín</h3>
       <p>Estos costos se vinculan con los productos vendidos de InfoClub y del histórico interno.</p>
-      <input type="file" accept=".xlsx,.xls,.xltx" onChange={subirExcel} />
+      {!soloLectura && <input type="file" accept=".xlsx,.xls,.xltx" onChange={subirExcel} />}
       {mensaje && <p>{mensaje}</p>}
     </section>
 

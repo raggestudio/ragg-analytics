@@ -2,18 +2,18 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
 export function Sidebar() {
-  const { esAdmin, soloLectura } = useAuth();
+  const { esAdmin, soloLectura, tienePermiso } = useAuth();
 
   return (
     <aside style={sidebar}>
       <h2 style={{ marginBottom: 8 }}>Ragg Analytics</h2>
       {soloLectura && <p style={modo}>Acceso de consulta</p>}
-      <MenuItem to="/dashboard">Dashboard</MenuItem>
+      {tienePermiso("dashboard") && <MenuItem to="/dashboard">Dashboard</MenuItem>}
       {esAdmin && <MenuItem to="/empresas">Empresas</MenuItem>}
-      <MenuItem to="/importaciones">Importaciones</MenuItem>
-      <MenuItem to="/productos">Productos</MenuItem>
-      <MenuItem to="/costos">Costos</MenuItem>
-      <MenuItem to="/vinculaciones">Vinculaciones</MenuItem>
+      {tienePermiso("importaciones") && <MenuItem to="/importaciones">Importaciones</MenuItem>}
+      {tienePermiso("productos") && <MenuItem to="/productos">Productos</MenuItem>}
+      {tienePermiso("costos") && <MenuItem to="/costos">Costos</MenuItem>}
+      {tienePermiso("vinculaciones") && <MenuItem to="/vinculaciones">Vinculaciones</MenuItem>}
     </aside>
   );
 }

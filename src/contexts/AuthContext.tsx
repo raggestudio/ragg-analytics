@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [cargando, setCargando] = useState(true);
+  const usuarioConPerfil = useRef<string | null>(null);
 
   useEffect(() => {
     let activo = true;
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sesion);
 
       if (!sesion) {
+        usuarioConPerfil.current = null;
         setPerfil(null);
         setCargando(false);
         return;
@@ -61,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPerfil(null);
       } else {
         setPerfil(data as Perfil);
+        usuarioConPerfil.current = sesion.user.id;
       }
 
       setCargando(false);
@@ -68,7 +72,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => cargarPerfil(data.session));
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nueva) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((evento, nueva) => {
+      /*
+       * Supabase renueva el token al recuperar el foco de la pestaña.
+       * Si sigue siendo el mismo usuario, conservamos la pantalla montada y
+       * únicamente actualizamos la sesión, sin volver a consultar el perfil.
+       */
+      if (
+        nueva &&
+        usuarioConPerfil.current === nueva.user.id &&
+        (evento === "TOKEN_REFRESHED" || evento === "SIGNED_IN")
+      ) {
+        setSession(nueva);
+        return;
+      }
+
       setCargando(true);
       void cargarPerfil(nueva);
     });

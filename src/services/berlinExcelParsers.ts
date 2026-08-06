@@ -136,6 +136,13 @@ export function normalizarProductoBerlin(value: string) {
     "agua vitale con y sin gas 600ml": "agua vitale con y sin gas 600ml",
     "crumble manzana": "crumble de manzana",
     "crumble de manzana": "crumble de manzana",
+    "brownie choco y nuez": "brownie chocolate y nuez",
+    "brownie de choco y nuez": "brownie chocolate y nuez",
+    "brownie chocolate y nuez": "brownie chocolate y nuez",
+    "brownie de chocolate y nuez": "brownie chocolate y nuez",
+    "dec arrito": "hamburguesa de carrito",
+    "decarrito": "hamburguesa de carrito",
+    "hamburguesa de carrito": "hamburguesa de carrito",
   };
 
   return alias[nombre] || nombre;
@@ -148,6 +155,8 @@ export function nombreProductoBerlin(value: string) {
     "refrescos linea coca": "REFRESCOS LÍNEA COCA COLA 350ML",
     "agua vitale con y sin gas 600ml": "AGUA VITALE CON Y SIN GAS 600ML",
     "crumble de manzana": "CRUMBLE DE MANZANA",
+    "brownie chocolate y nuez": "BROWNIE DE CHOCOLATE Y NUEZ",
+    "hamburguesa de carrito": "HAMBURGUESA DE CARRITO",
   };
 
   return nombres[nombre] || texto(value);

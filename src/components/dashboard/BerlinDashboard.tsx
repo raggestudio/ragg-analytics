@@ -23,6 +23,7 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
   const [costos, setCostos] = useState<any[]>([]);
   const [config, setConfig] = useState<BerlinProductoConfig[]>([]);
   const [vista, setVista] = useState<Vista>("total");
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
   const [mensaje, setMensaje] = useState("Cargando análisis de Berlín...");
 
   useEffect(() => {
@@ -91,6 +92,29 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
   const topMargen = [...analisis.lista].filter((p) => p.tieneCosto && p.facturacion > 0)
     .sort((a, b) => b.ganancia - a.ganancia).slice(0, 10);
 
+  const categoriasDisponibles = [...new Set(analisis.lista.map((p) => p.categoria))]
+    .filter((categoria) => categoria && categoria !== "Sin categoría")
+    .sort((a, b) => a.localeCompare(b, "es"));
+  const productosCategoria = categoriaSeleccionada
+    ? analisis.lista.filter((p) => p.categoria === categoriaSeleccionada)
+    : [];
+  const resumenCategoria = productosCategoria.reduce((resumen, producto) => ({
+    facturacion: resumen.facturacion + producto.facturacion,
+    costo: resumen.costo + producto.costo,
+    ganancia: resumen.ganancia + producto.ganancia,
+    unidades: resumen.unidades + producto.unidades,
+  }), { facturacion: 0, costo: 0, ganancia: 0, unidades: 0 });
+  const margenCategoria = resumenCategoria.facturacion > 0
+    ? (resumenCategoria.ganancia / resumenCategoria.facturacion) * 100 : 0;
+  const categoriaMasVendidos = [...productosCategoria]
+    .sort((a, b) => b.unidades - a.unidades).slice(0, 5);
+  const categoriaMenosVendidos = [...productosCategoria].filter((p) => p.unidades > 0)
+    .sort((a, b) => a.unidades - b.unidades || a.facturacion - b.facturacion).slice(0, 5);
+  const categoriaTopFacturacion = [...productosCategoria]
+    .sort((a, b) => b.facturacion - a.facturacion).slice(0, 5);
+  const categoriaTopGanancia = [...productosCategoria].filter((p) => p.tieneCosto)
+    .sort((a, b) => b.ganancia - a.ganancia).slice(0, 5);
+
   return <>
     <section style={card}>
       <h3>Análisis de Berlín</h3>
@@ -123,6 +147,30 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
       <RankingTable title="Menos vendidos" rows={menosVendidos} />
       <RankingTable title="Top facturación" rows={topFacturacion} />
       <RankingTable title="Top ganancia" rows={topMargen} />
+    </section>
+
+    <section style={card}>
+      <h3>Análisis por categoría · {nombresVista[vista]}</h3>
+      <label style={{ display: "block", marginBottom: 6 }}>Categoría</label>
+      <select value={categoriaSeleccionada} onChange={(e) => setCategoriaSeleccionada(e.target.value)} style={select}>
+        <option value="">Seleccionar categoría</option>
+        {categoriasDisponibles.map((categoria) => <option key={categoria} value={categoria}>{categoria}</option>)}
+      </select>
+
+      {!categoriaSeleccionada ? <p>Seleccioná una categoría para ver su análisis.</p> : <>
+        <div style={metrics}>
+          <Metric title="Facturación" value={moneda(resumenCategoria.facturacion)} />
+          <Metric title="Costo de productos" value={moneda(resumenCategoria.costo)} />
+          <Metric title="Ganancia" value={moneda(resumenCategoria.ganancia)} />
+          <Metric title="Margen" value={`${margenCategoria.toFixed(1)}%`} />
+          <Metric title="Cantidad" value={resumenCategoria.unidades.toLocaleString("es-UY")} />
+          <Metric title="Productos analizados" value={productosCategoria.length} />
+        </div>
+        <RankingTable title="Top 5 más vendidos" rows={categoriaMasVendidos} />
+        <RankingTable title="Top 5 menos vendidos" rows={categoriaMenosVendidos} />
+        <RankingTable title="Top 5 facturación" rows={categoriaTopFacturacion} />
+        <RankingTable title="Top 5 ganancia" rows={categoriaTopGanancia} />
+      </>}
     </section>
   </>;
 }

@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
 import type { VentaBerlinImportada } from "./berlinExcelParsers";
-import { normalizarProductoBerlin } from "./berlinExcelParsers";
+import { nombreProductoBerlin, normalizarProductoBerlin } from "./berlinExcelParsers";
 
 export type FuenteBerlin = "infoclub" | "historico_no" | "ocr_salon" | "ocr_delivery" | "ocr_takeaway";
 
@@ -51,10 +51,13 @@ export async function obtenerProductosDetectadosBerlin(empresaId: string) {
       .range(desde, desde + tamanoPagina - 1);
     if (error) throw error;
     const pagina = data || [];
-    for (const producto of pagina) productos.set(producto.nombre_normalizado, {
-      nombre_normalizado: producto.nombre_normalizado,
-      nombre_producto: producto.nombre_producto,
+    for (const producto of pagina) {
+      const nombreNormalizado = normalizarProductoBerlin(producto.nombre_producto);
+      productos.set(nombreNormalizado, {
+      nombre_normalizado: nombreNormalizado,
+      nombre_producto: nombreProductoBerlin(producto.nombre_producto),
     });
+    }
     if (pagina.length < tamanoPagina) break;
     desde += tamanoPagina;
   }

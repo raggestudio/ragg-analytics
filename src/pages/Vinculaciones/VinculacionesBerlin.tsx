@@ -38,7 +38,9 @@ export default function VinculacionesBerlin({ empresaId }: { empresaId: string }
 
   useEffect(() => { cargar().catch((error) => setMensaje(error.message)); }, [empresaId]);
 
-  const configMap = useMemo(() => new Map(config.map((item) => [item.nombre_normalizado, item])), [config]);
+  const configMap = useMemo(() => new Map(config.map((item) => [
+    normalizarProductoBerlin(item.nombre_producto || item.nombre_normalizado), item,
+  ])), [config]);
   const costoExactoMap = useMemo(() => new Map(
     costos.map((costo) => [normalizarProductoBerlin(costo.nombre_producto), costo])
   ), [costos]);

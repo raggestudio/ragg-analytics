@@ -5,7 +5,7 @@ import {
   obtenerVentasBerlin,
   type BerlinProductoConfig,
 } from "../../services/berlinService";
-import { normalizarProductoBerlin } from "../../services/berlinExcelParsers";
+import { nombreProductoBerlin, normalizarProductoBerlin } from "../../services/berlinExcelParsers";
 
 type Vista = "total" | "salon" | "delivery" | "take_away";
 type Props = { empresaId: string; periodoIds: string[]; sucursalId?: string | null };
@@ -42,12 +42,14 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
   const analisis = useMemo(() => {
     const costosId = new Map(costos.map((c) => [c.id, c]));
     const costosNombre = new Map(costos.map((c) => [normalizarProductoBerlin(c.nombre_producto), c]));
-    const configNombre = new Map(config.map((c) => [c.nombre_normalizado, c]));
+    const configNombre = new Map(config.map((c) => [
+      normalizarProductoBerlin(c.nombre_producto || c.nombre_normalizado), c,
+    ]));
     const filtradas = vista === "total" ? ventas : ventas.filter((v) => v.modalidad === vista);
     const productos = new Map<string, any>();
     const tickets = new Set<string>();
     for (const venta of filtradas) {
-      const key = venta.nombre_normalizado || normalizarProductoBerlin(venta.nombre_producto);
+      const key = normalizarProductoBerlin(venta.nombre_producto);
       const cfg = configNombre.get(key);
       const costo = (cfg?.costo_manual_id && costosId.get(cfg.costo_manual_id)) || costosNombre.get(key);
       const cantidad = Math.round(Number(venta.cantidad || 0));
@@ -55,7 +57,7 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
       const costoTotal = costo ? Number(costo.costo || 0) * cantidad : 0;
       tickets.add(`${venta.fuente}:${venta.documento}`);
       const current = productos.get(key) || {
-        nombre: venta.nombre_producto, categoria: cfg?.categoria || "Sin categoría", unidades: 0,
+        nombre: nombreProductoBerlin(venta.nombre_producto), categoria: cfg?.categoria || "Sin categoría", unidades: 0,
         facturacion: 0, costo: 0, tieneCosto: Boolean(costo),
       };
       current.unidades += cantidad; current.facturacion += facturacion; current.costo += costoTotal;

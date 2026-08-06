@@ -126,5 +126,27 @@ export async function leerHistoricoNoFacturadoBerlin(file: File): Promise<VentaB
 }
 
 export function normalizarProductoBerlin(value: string) {
-  return clave(value);
+  const nombre = clave(value);
+
+  const alias: Record<string, string> = {
+    "refrescos linea coca cola 350ml": "refrescos linea coca",
+    "refrescos linea coca": "refrescos linea coca",
+    "agua vitale con y": "agua vitale con y sin gas 600ml",
+    "agua vitale con y sin gas 600ml": "agua vitale con y sin gas 600ml",
+    "crumble de manzana": "crumble de manzana",
+  };
+
+  return alias[nombre] || nombre;
+}
+
+export function nombreProductoBerlin(value: string) {
+  const nombre = normalizarProductoBerlin(value);
+
+  const nombres: Record<string, string> = {
+    "refrescos linea coca": "REFRESCOS LÍNEA COCA COLA 350ML",
+    "agua vitale con y sin gas 600ml": "AGUA VITALE CON Y SIN GAS 600ML",
+    "crumble de manzana": "CRUMBLE DE MANZANA",
+  };
+
+  return nombres[nombre] || texto(value);
 }

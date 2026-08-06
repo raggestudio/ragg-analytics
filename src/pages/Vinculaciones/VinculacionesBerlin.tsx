@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { obtenerCostosManualesPorEmpresa, type CostoProductoManual } from "../../services/costosManualService";
 import { guardarConfiguracionBerlin, obtenerConfiguracionBerlin, type BerlinProductoConfig } from "../../services/berlinService";
+import { normalizarProductoBerlin } from "../../services/berlinExcelParsers";
 
 const CATEGORIAS = ["HAMBURGUESAS", "OTRAS COMIDAS", "CERVEZAS", "TRAGOS", "BEBIDAS", "POSTRES", "CAFETERIA"];
 
@@ -24,6 +25,9 @@ export default function VinculacionesBerlin({ empresaId }: { empresaId: string }
   }
   useEffect(() => { cargar().catch((e) => setMensaje(e.message)); }, [empresaId]);
   const configMap = useMemo(() => new Map(config.map((c) => [c.nombre_normalizado, c])), [config]);
+  const costoExactoMap = useMemo(() => new Map(
+    costos.map((costo) => [normalizarProductoBerlin(costo.nombre_producto), costo])
+  ), [costos]);
   const visibles = productos.filter((p) => !buscar || p.nombre_producto.toLowerCase().includes(buscar.toLowerCase()));
 
   async function guardar(producto: any, categoria: string, costoId: string) {
@@ -36,12 +40,15 @@ export default function VinculacionesBerlin({ empresaId }: { empresaId: string }
     <section style={card}><div style={summary}>
       <strong>Productos detectados: {productos.length}</strong>
       <strong>Sin categoría: {productos.filter((p) => !configMap.get(p.nombre_normalizado)?.categoria).length}</strong>
-      <strong>Sin costo vinculado: {productos.filter((p) => !configMap.get(p.nombre_normalizado)?.costo_manual_id).length}</strong>
+      <strong>Sin costo identificado: {productos.filter((p) =>
+        !configMap.get(p.nombre_normalizado)?.costo_manual_id && !costoExactoMap.has(p.nombre_normalizado)
+      ).length}</strong>
     </div><input style={input} placeholder="Buscar producto..." value={buscar} onChange={(e) => setBuscar(e.target.value)} />
     {mensaje && <p>{mensaje}</p>}</section>
     <section style={card}>{visibles.map((p) => {
       const cfg = configMap.get(p.nombre_normalizado);
-      let categoria = cfg?.categoria || ""; let costoId = cfg?.costo_manual_id || "";
+      const costoExacto = costoExactoMap.get(p.nombre_normalizado);
+      let categoria = cfg?.categoria || ""; let costoId = cfg?.costo_manual_id || costoExacto?.id || "";
       return <div key={p.nombre_normalizado} style={row}>
         <strong>{p.nombre_producto}</strong>
         <select defaultValue={categoria} onChange={(e) => { categoria = e.target.value; }} style={input}>

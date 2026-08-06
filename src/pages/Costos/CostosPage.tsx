@@ -8,6 +8,7 @@ import {
   obtenerRecetasPorEmpresa,
 } from "../../services/costosService";
 import type { Insumo, Receta } from "../../types/costos";
+import CostosBerlin from "./CostosBerlin";
 
 const CLAVE_EMPRESA_COSTOS = "costos-empresa-seleccionada";
 
@@ -101,6 +102,9 @@ export function CostosPage() {
     .toLowerCase()
     .includes(busquedaInsumo.toLowerCase())
 );
+  const empresaActual = empresas.find((empresa) => empresa.id === empresaId);
+  const esBerlin = empresaActual?.nombre.toLowerCase().includes("berlín") ||
+    empresaActual?.nombre.toLowerCase().includes("berlin");
   return (
     <div>
       <h2>Costos</h2>
@@ -129,6 +133,8 @@ export function CostosPage() {
 
         {mensaje && <p>{mensaje}</p>}
       </section>
+
+      {esBerlin ? <CostosBerlin empresaId={empresaId} /> : <>
 
       <section style={card}>
         <h3>Resumen</h3>
@@ -204,6 +210,7 @@ export function CostosPage() {
   ))
 )}
       </section>
+      </>}
     </div>
   );
 }

@@ -49,9 +49,24 @@ export async function guardarConfiguracionBerlin(input: BerlinProductoConfig) {
 
 export async function obtenerVentasBerlin(input: { empresa_id: string; periodo_ids: string[]; sucursal_id?: string | null }) {
   if (!input.periodo_ids.length) return [];
-  let query = supabase.from("berlin_ventas").select("*").eq("empresa_id", input.empresa_id).in("periodo_id", input.periodo_ids);
-  if (input.sucursal_id) query = query.eq("sucursal_id", input.sucursal_id);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
+  const todas: any[] = [];
+  const tamanoPagina = 1000;
+  let desde = 0;
+
+  while (true) {
+    let query = supabase.from("berlin_ventas").select("*")
+      .eq("empresa_id", input.empresa_id)
+      .in("periodo_id", input.periodo_ids)
+      .order("id", { ascending: true })
+      .range(desde, desde + tamanoPagina - 1);
+    if (input.sucursal_id) query = query.eq("sucursal_id", input.sucursal_id);
+    const { data, error } = await query;
+    if (error) throw error;
+    const pagina = data || [];
+    todas.push(...pagina);
+    if (pagina.length < tamanoPagina) break;
+    desde += tamanoPagina;
+  }
+
+  return todas;
 }

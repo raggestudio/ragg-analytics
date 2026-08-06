@@ -115,14 +115,12 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
     </section>
 
     <section style={card}><h3>Resultado por categoría · {nombresVista[vista]}</h3>
-      <Table rows={analisis.categorias} category />
+      <ResultTable rows={analisis.categorias} firstTitle="Categoría" />
     </section>
     <section style={card}><h3>Rankings generales · {nombresVista[vista]}</h3>
-      <div style={columns}>
-        <Ranking title="Más vendidos" rows={topVendidos} value={(p) => `${p.unidades} u.`} />
-        <Ranking title="Top facturación" rows={topFacturacion} value={(p) => moneda(p.facturacion)} />
-        <Ranking title="Top ganancia" rows={topMargen} value={(p) => `${moneda(p.ganancia)} · ${p.margen.toFixed(1)}%`} />
-      </div>
+      <RankingTable title="Más vendidos" rows={topVendidos} />
+      <RankingTable title="Top facturación" rows={topFacturacion} />
+      <RankingTable title="Top ganancia" rows={topMargen} />
     </section>
   </>;
 }
@@ -130,22 +128,34 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
 function Metric({ title, value }: { title: string; value: string | number }) {
   return <div style={metric}><strong>{title}</strong><span>{value}</span></div>;
 }
-function Table({ rows }: { rows: any[]; category?: boolean }) {
-  return <div>{rows.map((r) => <div key={r.nombre} style={row}>
-    <strong>{r.nombre}</strong><span>{r.unidades.toLocaleString("es-UY")} u.</span>
+function ResultTable({ rows, firstTitle }: { rows: any[]; firstTitle: string }) {
+  return <div style={tableWrap}><div style={{ ...row, ...headerRow }}>
+    <strong>{firstTitle}</strong><strong>Cantidad</strong><strong>Facturación</strong>
+    <strong>Costo</strong><strong>Ganancia</strong><strong>Margen</strong>
+  </div>{rows.map((r) => <div key={r.nombre} style={row}>
+    <strong>{r.nombre}</strong><span>{r.unidades.toLocaleString("es-UY")}</span>
     <span>{moneda(r.facturacion)}</span><span>{moneda(r.costo)}</span>
     <span>{moneda(r.ganancia)}</span><span>{r.margen.toFixed(1)}%</span>
   </div>)}</div>;
 }
-function Ranking({ title, rows, value }: { title: string; rows: any[]; value: (row: any) => string }) {
-  return <div><h4>{title}</h4>{rows.map((r, i) => <div key={`${r.nombre}-${i}`} style={rankRow}>
-    <span>{i + 1}. {r.nombre}</span><strong>{value(r)}</strong>
-  </div>)}</div>;
+function RankingTable({ title, rows }: { title: string; rows: any[] }) {
+  return <div style={{ marginTop: 28 }}><h4>{title}</h4><div style={tableWrap}>
+    <div style={{ ...rankingRow, ...headerRow }}>
+      <strong>Producto</strong><strong>Cantidad</strong><strong>Facturación</strong>
+      <strong>Costo</strong><strong>Ganancia</strong><strong>Margen</strong>
+    </div>
+    {rows.map((r, index) => <div key={`${r.nombre}-${index}`} style={rankingRow}>
+      <strong>{index + 1}. {r.nombre}</strong><span>{r.unidades.toLocaleString("es-UY")}</span>
+      <span>{moneda(r.facturacion)}</span><span>{moneda(r.costo)}</span>
+      <span>{moneda(r.ganancia)}</span><span>{r.margen.toFixed(1)}%</span>
+    </div>)}
+  </div></div>;
 }
 const card: React.CSSProperties = { background: "#1e293b", padding: 24, marginTop: 24, borderRadius: 16 };
 const select: React.CSSProperties = { width: "100%", maxWidth: 420, padding: 12, borderRadius: 8 };
 const metrics: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14, marginTop: 18 };
 const metric: React.CSSProperties = { background: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: 16, display: "grid", gap: 8 };
-const columns: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 24 };
 const row: React.CSSProperties = { display: "grid", gridTemplateColumns: "2fr repeat(5, 1fr)", gap: 12, padding: "10px 0", borderBottom: "1px solid #334155" };
-const rankRow: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid #334155" };
+const rankingRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "2.3fr repeat(5, 1fr)", gap: 12, padding: "10px 0", borderBottom: "1px solid #334155", alignItems: "center" };
+const headerRow: React.CSSProperties = { color: "#cbd5e1", borderBottom: "2px solid #64748b" };
+const tableWrap: React.CSSProperties = { overflowX: "auto", minWidth: 760 };

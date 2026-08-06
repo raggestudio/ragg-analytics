@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../lib/supabase";
 import { obtenerCostosManualesPorEmpresa, type CostoProductoManual } from "../../services/costosManualService";
-import { guardarConfiguracionBerlin, obtenerConfiguracionBerlin, type BerlinProductoConfig } from "../../services/berlinService";
+import { guardarConfiguracionBerlin, obtenerConfiguracionBerlin, obtenerProductosDetectadosBerlin, type BerlinProductoConfig } from "../../services/berlinService";
 import { normalizarProductoBerlin } from "../../services/berlinExcelParsers";
 
 const CATEGORIAS = ["HAMBURGUESAS", "OTRAS COMIDAS", "CERVEZAS", "TRAGOS", "BEBIDAS", "POSTRES", "CAFETERIA"];
@@ -27,15 +26,12 @@ export default function VinculacionesBerlin({ empresaId }: { empresaId: string }
   const [mensaje, setMensaje] = useState("");
 
   async function cargar() {
-    const [{ data, error }, costosData, configData] = await Promise.all([
-      supabase.from("berlin_ventas").select("nombre_normalizado,nombre_producto").eq("empresa_id", empresaId),
+    const [productosData, costosData, configData] = await Promise.all([
+      obtenerProductosDetectadosBerlin(empresaId),
       obtenerCostosManualesPorEmpresa(empresaId),
       obtenerConfiguracionBerlin(empresaId),
     ]);
-    if (error) throw error;
-    const map = new Map<string, any>();
-    for (const producto of data || []) map.set(producto.nombre_normalizado, producto);
-    setProductos([...map.values()]);
+    setProductos(productosData);
     setCostos(costosData);
     setConfig(configData);
   }

@@ -19,7 +19,7 @@ export async function reemplazarVentasBerlin(input: {
     periodo_id: input.periodo_id, periodo_anio: input.periodo_anio, periodo_mes: input.periodo_mes,
     fuente: input.fuente, documento: v.documento, fecha: v.fecha, modalidad: v.modalidad,
     nombre_producto: v.nombre_producto, nombre_normalizado: normalizarProductoBerlin(v.nombre_producto),
-    cantidad: v.cantidad, precio_unitario: v.precio_unitario, venta_total: v.venta_total,
+    cantidad: Math.round(Number(v.cantidad || 0)), precio_unitario: v.precio_unitario, venta_total: v.venta_total,
   }));
   for (let i = 0; i < rows.length; i += 400) {
     const { error } = await supabase.from("berlin_ventas").insert(rows.slice(i, i + 400));
@@ -37,6 +37,28 @@ export async function obtenerConfiguracionBerlin(empresaId: string) {
   const { data, error } = await supabase.from("berlin_producto_config").select("*").eq("empresa_id", empresaId);
   if (error) throw error;
   return (data || []) as BerlinProductoConfig[];
+}
+
+export async function obtenerProductosDetectadosBerlin(empresaId: string) {
+  const productos = new Map<string, { nombre_normalizado: string; nombre_producto: string }>();
+  const tamanoPagina = 1000;
+  let desde = 0;
+  while (true) {
+    const { data, error } = await supabase.from("berlin_ventas")
+      .select("id,nombre_normalizado,nombre_producto")
+      .eq("empresa_id", empresaId)
+      .order("id", { ascending: true })
+      .range(desde, desde + tamanoPagina - 1);
+    if (error) throw error;
+    const pagina = data || [];
+    for (const producto of pagina) productos.set(producto.nombre_normalizado, {
+      nombre_normalizado: producto.nombre_normalizado,
+      nombre_producto: producto.nombre_producto,
+    });
+    if (pagina.length < tamanoPagina) break;
+    desde += tamanoPagina;
+  }
+  return [...productos.values()];
 }
 
 export async function guardarConfiguracionBerlin(input: BerlinProductoConfig) {

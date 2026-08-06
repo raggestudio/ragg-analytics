@@ -49,7 +49,7 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
       const key = venta.nombre_normalizado || normalizarProductoBerlin(venta.nombre_producto);
       const cfg = configNombre.get(key);
       const costo = (cfg?.costo_manual_id && costosId.get(cfg.costo_manual_id)) || costosNombre.get(key);
-      const cantidad = Number(venta.cantidad || 0);
+      const cantidad = Math.round(Number(venta.cantidad || 0));
       const facturacion = Number(venta.venta_total || 0);
       const costoTotal = costo ? Number(costo.costo || 0) * cantidad : 0;
       tickets.add(`${venta.fuente}:${venta.documento}`);
@@ -85,6 +85,8 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
   }, [ventas, costos, config, vista]);
 
   const topVendidos = [...analisis.lista].sort((a, b) => b.unidades - a.unidades).slice(0, 10);
+  const menosVendidos = [...analisis.lista].filter((p) => p.unidades > 0)
+    .sort((a, b) => a.unidades - b.unidades || a.facturacion - b.facturacion).slice(0, 10);
   const topFacturacion = [...analisis.lista].sort((a, b) => b.facturacion - a.facturacion).slice(0, 10);
   const topMargen = [...analisis.lista].filter((p) => p.tieneCosto && p.facturacion > 0)
     .sort((a, b) => b.ganancia - a.ganancia).slice(0, 10);
@@ -102,7 +104,6 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
         <Metric title="Costo de productos" value={moneda(analisis.costo)} />
         <Metric title="Ganancia" value={moneda(analisis.ganancia)} />
         <Metric title={analisis.sinCosto ? "Margen provisorio" : "Margen"} value={`${analisis.margen.toFixed(1)}%`} />
-        <Metric title="Cobertura de costos" value={`${analisis.coberturaCosto.toFixed(1)}%`} />
         <Metric title="Tickets" value={analisis.tickets.toLocaleString("es-UY")} />
         <Metric title="Ticket promedio" value={moneda(analisis.tickets ? analisis.facturacion / analisis.tickets : 0)} />
         <Metric title="Unidades" value={analisis.unidades.toLocaleString("es-UY")} />
@@ -119,6 +120,7 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
     </section>
     <section style={card}><h3>Rankings generales · {nombresVista[vista]}</h3>
       <RankingTable title="Más vendidos" rows={topVendidos} />
+      <RankingTable title="Menos vendidos" rows={menosVendidos} />
       <RankingTable title="Top facturación" rows={topFacturacion} />
       <RankingTable title="Top ganancia" rows={topMargen} />
     </section>

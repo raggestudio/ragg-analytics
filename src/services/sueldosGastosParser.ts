@@ -13,10 +13,34 @@ function numero(valor: unknown) {
 }
 
 function periodo(valor: unknown) {
-  const match = String(valor ?? "").trim().match(/^(\d{1,2})\/(\d{4})$/);
-  if (!match) return null;
-  const mes = Number(match[1]);
-  const anio = Number(match[2]);
+  const texto = String(valor ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  const meses: Record<string, number> = {
+    ene: 1, enero: 1,
+    feb: 2, febrero: 2,
+    mar: 3, marzo: 3,
+    abr: 4, abril: 4,
+    may: 5, mayo: 5,
+    jun: 6, junio: 6,
+    jul: 7, julio: 7,
+    ago: 8, agosto: 8,
+    sep: 9, set: 9, septiembre: 9, setiembre: 9,
+    oct: 10, octubre: 10,
+    nov: 11, noviembre: 11,
+    dic: 12, diciembre: 12,
+  };
+
+  const numerico = texto.match(/^(\d{1,2})[\/-](\d{2}|\d{4})$/);
+  const nombrado = texto.match(/^([a-z]+)[\s\/-]+(\d{2}|\d{4})$/);
+  if (!numerico && !nombrado) return null;
+
+  const mes = numerico ? Number(numerico[1]) : meses[nombrado![1]];
+  const anioCorto = Number((numerico || nombrado)![2]);
+  const anio = anioCorto < 100 ? 2000 + anioCorto : anioCorto;
   if (mes < 1 || mes > 12) return null;
   return { mes, anio };
 }

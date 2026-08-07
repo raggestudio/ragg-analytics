@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import type { GastoEmpresa, GastoEmpresaInput } from "../types/gasto";
+import type { GastoEmpresa, GastoEmpresaInput, SueldoGastoImportado } from "../types/gasto";
 
 function convertir(fila: any): GastoEmpresa {
   return {
@@ -40,12 +40,29 @@ export async function crearGasto(input: GastoEmpresaInput): Promise<GastoEmpresa
       monto,
       fecha: input.fecha || null,
       observaciones: input.observaciones?.trim() || null,
+      origen: input.origen || "manual",
+      referencia: input.referencia?.trim() || null,
     })
     .select("*")
     .single();
 
   if (error) throw error;
   return convertir(data);
+}
+
+export async function reemplazarSalariosDesdeCsv(input: {
+  empresa_id: string;
+  periodo_id: string;
+  filas: SueldoGastoImportado[];
+}) {
+  const { data, error } = await supabase.rpc("reemplazar_salarios_gastos", {
+    p_empresa_id: input.empresa_id,
+    p_periodo_id: input.periodo_id,
+    p_filas: input.filas,
+  });
+
+  if (error) throw error;
+  return Number(data || 0);
 }
 
 export async function actualizarGasto(

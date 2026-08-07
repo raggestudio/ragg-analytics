@@ -4,12 +4,14 @@ import {
   crearGasto,
   eliminarGasto,
   obtenerGastosPorPeriodo,
+  reemplazarSalariosDesdeCsv,
 } from "../../services/gastosService";
+import { leerCsvSueldos } from "../../services/sueldosGastosParser";
+import { obtenerEmpresas } from "../../services/empresaService";
 import { obtenerPeriodosPorEmpresa } from "../../services/periodoService";
 import type { GastoEmpresa } from "../../types/gasto";
 import type { Periodo } from "../../types/periodo";
-
-const BERLIN_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
+import type { Empresa } from "../../types/empresa";
 
 const CATEGORIAS = [
   "Alquiler",
@@ -27,6 +29,7 @@ const CATEGORIAS = [
   "Comisión tarjetas",
   "Servicio de facturación",
   "Salarios y jornales",
+  "Jornales extras",
   "Gastos extras",
   "Otros gastos",
 ] as const;
@@ -78,6 +81,8 @@ function periodoPredeterminado(periodos: Periodo[]) {
 }
 
 export function GastosPage() {
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [empresaId, setEmpresaId] = useState("");
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [periodoId, setPeriodoId] = useState("");
   const [gastos, setGastos] = useState<GastoEmpresa[]>([]);
@@ -87,7 +92,24 @@ export function GastosPage() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    obtenerPeriodosPorEmpresa(BERLIN_ID)
+    obtenerEmpresas()
+      .then((data) => {
+        setEmpresas(data);
+        const guardada = localStorage.getItem("gastos-empresa-seleccionada");
+        const inicial = data.some((empresa) => empresa.id === guardada) ? guardada! : data[0]?.id || "";
+        setEmpresaId(inicial);
+      })
+      .catch((error) => setMensaje(error?.message || "No se pudieron cargar las empresas."))
+      .finally(() => setCargando(false));
+  }, []);
+
+  useEffect(() => {
+    if (!empresaId) return;
+    localStorage.setItem("gastos-empresa-seleccionada", empresaId);
+    setPeriodoId("");
+    setGastos([]);
+    setCargando(true);
+    obtenerPeriodosPorEmpresa(empresaId)
       .then((data) => {
         const ordenados = [...data].sort((a, b) => b.anio - a.anio || b.mes - a.mes);
         setPeriodos(ordenados);
@@ -95,7 +117,7 @@ export function GastosPage() {
       })
       .catch((error) => setMensaje(error?.message || "No se pudieron cargar los períodos."))
       .finally(() => setCargando(false));
-  }, []);
+  }, [empresaId]);
 
   useEffect(() => {
     if (!periodoId) {
@@ -103,11 +125,11 @@ export function GastosPage() {
       return;
     }
     setCargando(true);
-    obtenerGastosPorPeriodo({ empresa_id: BERLIN_ID, periodo_id: periodoId })
+    obtenerGastosPorPeriodo({ empresa_id: empresaId, periodo_id: periodoId })
       .then(setGastos)
       .catch((error) => setMensaje(error?.message || "No se pudieron cargar los gastos."))
       .finally(() => setCargando(false));
-  }, [periodoId]);
+  }, [empresaId, periodoId]);
 
   const total = useMemo(
     () => gastos.reduce((suma, gasto) => suma + gasto.monto, 0),
@@ -132,7 +154,7 @@ export function GastosPage() {
     try {
       setMensaje("Guardando...");
       const input = {
-        empresa_id: BERLIN_ID,
+        empresa_id: empresaId,
         periodo_id: periodoId,
         categoria: formulario.categoria,
         detalle: formulario.detalle,
@@ -146,7 +168,7 @@ export function GastosPage() {
 
       setFormulario(FORMULARIO_VACIO);
       setEditandoId(null);
-      setGastos(await obtenerGastosPorPeriodo({ empresa_id: BERLIN_ID, periodo_id: periodoId }));
+      setGastos(await obtenerGastosPorPeriodo({ empresa_id: empresaId, periodo_id: periodoId }));
       setMensaje(editandoId ? "Gasto actualizado." : "Gasto registrado.");
     } catch (error: any) {
       setMensaje(error?.message || "No se pudo guardar el gasto.");
@@ -168,7 +190,7 @@ export function GastosPage() {
   async function borrar(gasto: GastoEmpresa) {
     if (!window.confirm(`¿Eliminar ${gasto.categoria} por ${moneda(gasto.monto)}?`)) return;
     try {
-      await eliminarGasto(gasto.id, BERLIN_ID);
+      await eliminarGasto(gasto.id, empresaId);
       setGastos((actuales) => actuales.filter((item) => item.id !== gasto.id));
       setMensaje("Gasto eliminado.");
     } catch (error: any) {
@@ -176,21 +198,81 @@ export function GastosPage() {
     }
   }
 
+  async function importarSueldos(archivo: File) {
+    if (!empresaId || !periodoId) {
+      setMensaje("Seleccioná una empresa y un período antes de importar.");
+      return;
+    }
+
+    try {
+      setMensaje("Leyendo archivo de sueldos...");
+      const filas = await leerCsvSueldos(archivo);
+      const periodosArchivo = new Set(filas.map((fila) => `${fila.periodo_anio}-${fila.periodo_mes}`));
+      if (periodosArchivo.size !== 1) {
+        throw new Error("El archivo debe contener una única liquidación mensual.");
+      }
+
+      const periodoSeleccionado = periodos.find((periodo) => periodo.id === periodoId);
+      const primera = filas[0];
+      if (!periodoSeleccionado || periodoSeleccionado.anio !== primera.periodo_anio || periodoSeleccionado.mes !== primera.periodo_mes) {
+        throw new Error(`El archivo corresponde a ${primera.periodo_mes}/${primera.periodo_anio}. Seleccioná ese período antes de importarlo.`);
+      }
+
+      const empresa = empresas.find((item) => item.id === empresaId);
+      const totalLiquido = filas.reduce((total, fila) => total + fila.liquido, 0);
+      const confirmar = window.confirm(
+        `Se importarán ${filas.length} empleados en ${empresa?.nombre || "la empresa"} por un total líquido de ${moneda(totalLiquido)}.\n\nLa importación anterior de sueldos de este período será reemplazada. Los aportes de BPS se registran por separado.`
+      );
+      if (!confirmar) {
+        setMensaje("Importación cancelada.");
+        return;
+      }
+
+      const cantidad = await reemplazarSalariosDesdeCsv({ empresa_id: empresaId, periodo_id: periodoId, filas });
+      setGastos(await obtenerGastosPorPeriodo({ empresa_id: empresaId, periodo_id: periodoId }));
+      setMensaje(`Sueldos importados correctamente: ${cantidad} empleados · ${moneda(totalLiquido)} de salarios líquidos.`);
+    } catch (error: any) {
+      setMensaje(error?.message || "No se pudo importar el archivo de sueldos.");
+    }
+  }
+
   return (
     <div>
-      <h2>Gastos · Berlín</h2>
+      <h2>Gastos</h2>
 
       <section style={card}>
-        <h3>Período</h3>
+        <h3>Empresa y período</h3>
+        <div style={formGrid}>
+        <label style={label}>Empresa
+        <select style={input} value={empresaId} onChange={(event) => setEmpresaId(event.target.value)}>
+          {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
+        </select>
+        </label>
+        <label style={label}>Período
         <select style={input} value={periodoId} onChange={(event) => setPeriodoId(event.target.value)}>
           {periodos.map((periodo) => (
             <option key={periodo.id} value={periodo.id}>{periodo.nombre}</option>
           ))}
         </select>
+        </label>
+        </div>
+      </section>
+
+      <section style={card}>
+        <h3>Importar salarios y jornales</h3>
+        <p>Subí el CSV mensual generado por el sistema de sueldos. Se contabilizará únicamente la columna <strong>Líquido</strong>. La nómina y los aportes de BPS se registran por separado para no duplicarlos.</p>
+        <p>Si volvés a importar el mismo mes, se reemplaza únicamente la importación anterior de salarios; los demás gastos no se modifican.</p>
+        <input type="file" accept=".csv,text/csv" disabled={!empresaId || !periodoId}
+          onChange={(event) => {
+            const archivo = event.target.files?.[0];
+            if (archivo) void importarSueldos(archivo);
+            event.currentTarget.value = "";
+          }} />
       </section>
 
       <section style={card}>
         <h3>{editandoId ? "Editar gasto" : "Registrar gasto"}</h3>
+        <p>Para personal eventual o días especiales, elegí <strong>Jornales extras</strong> e ingresá solamente el importe. El detalle y las observaciones son opcionales.</p>
         <div style={formGrid}>
           <label style={label}>Categoría
             <select style={input} value={formulario.categoria} onChange={(e) => cambiar("categoria", e.target.value)}>
@@ -245,10 +327,10 @@ export function GastosPage() {
         {cargando ? <p>Cargando...</p> : gastos.length === 0 ? <p>No hay gastos registrados en este período.</p> : (
           <div style={{ overflowX: "auto" }}>
             <table style={table}>
-              <thead><tr><th>Categoría</th><th>Detalle</th><th>Fecha</th><th>Importe</th><th>Observaciones</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Categoría</th><th>Detalle</th><th>Origen</th><th>Fecha</th><th>Importe</th><th>Observaciones</th><th>Acciones</th></tr></thead>
               <tbody>{gastos.map((gasto) => (
                 <tr key={gasto.id}>
-                  <td>{gasto.categoria}</td><td>{gasto.detalle || "-"}</td><td>{gasto.fecha || "-"}</td>
+                  <td>{gasto.categoria}</td><td>{gasto.detalle || "-"}</td><td>{gasto.origen === "sueldos_csv" ? "Sistema de sueldos" : "Manual"}</td><td>{gasto.fecha || "-"}</td>
                   <td>{moneda(gasto.monto)}</td><td>{gasto.observaciones || "-"}</td>
                   <td><div style={actions}><button style={smallButton} onClick={() => editar(gasto)}>Editar</button>
                     <button style={dangerButton} onClick={() => void borrar(gasto)}>Eliminar</button></div></td>

@@ -13,6 +13,7 @@ export function Sidebar() {
       {tienePermiso("importaciones") && <MenuItem to="/importaciones">Importaciones</MenuItem>}
       {tienePermiso("productos") && <MenuItem to="/productos">Productos</MenuItem>}
       {tienePermiso("costos") && <MenuItem to="/costos">Costos</MenuItem>}
+      {esAdmin && <MenuItem to="/gastos">Gastos</MenuItem>}
       {tienePermiso("vinculaciones") && <MenuItem to="/vinculaciones">Vinculaciones</MenuItem>}
     </aside>
   );

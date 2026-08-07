@@ -11,6 +11,7 @@ import { ImportacionesPage } from "./pages/Importaciones";
 import { ProductosPage } from "./pages/Productos";
 import { CostosPage } from "./pages/Costos";
 import VinculacionesPage from "./pages/Vinculaciones/VinculacionesPage";
+import { GastosPage } from "./pages/Gastos/GastosPage";
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
               </Route>
               <Route element={<RutaAdmin />}>
                 <Route path="/empresas" element={<EmpresasPage />} />
+                <Route path="/gastos" element={<GastosPage />} />
               </Route>
             </Route>
           </Route>

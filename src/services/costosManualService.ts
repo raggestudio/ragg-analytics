@@ -121,6 +121,40 @@ export async function obtenerCostosManualesPorEmpresa(
   }));
 }
 
+export async function actualizarCostoManual(input: {
+  id: string;
+  empresa_id: string;
+  costo: number;
+}): Promise<CostoProductoManual> {
+  const costo = Number(input.costo);
+
+  if (!Number.isFinite(costo) || costo < 0) {
+    throw new Error("El costo debe ser un número mayor o igual a cero.");
+  }
+
+  const { data, error } = await supabase
+    .from("producto_costo_manual")
+    .update({
+      costo,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.id)
+    .eq("empresa_id", input.empresa_id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+
+  return {
+    ...data,
+    costo: Number(data.costo || 0),
+    precio_referencia:
+      data.precio_referencia === null
+        ? null
+        : Number(data.precio_referencia),
+  } as CostoProductoManual;
+}
+
 export function buscarCostoManualPorNombre(
   nombreProducto: string,
   costos: CostoProductoManual[]

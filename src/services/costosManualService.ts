@@ -31,8 +31,10 @@ function normalizar(texto: string) {
 export async function importarCostosManualesDuna(input: {
   empresa_id: string;
   data: CostosDunaParseResult;
+  origen?: "excel_duna" | "excel_berlin";
 }) {
   const empresaId = input.empresa_id;
+  const origen = input.origen || "excel_duna";
 
   /*
     Primero dejamos inactivos los costos anteriores importados desde Duna.
@@ -47,7 +49,7 @@ export async function importarCostosManualesDuna(input: {
       updated_at: new Date().toISOString(),
     })
     .eq("empresa_id", empresaId)
-    .eq("origen", "excel_duna");
+    .eq("origen", origen);
 
   if (desactivarError) throw desactivarError;
 
@@ -70,7 +72,7 @@ export async function importarCostosManualesDuna(input: {
         producto.precio_referencia === null
           ? null
           : Number(producto.precio_referencia),
-      origen: "excel_duna",
+      origen,
       estimado: false,
       activo: true,
       updated_at: ahora,

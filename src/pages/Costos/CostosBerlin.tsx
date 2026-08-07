@@ -29,7 +29,11 @@ export default function CostosBerlin({ empresaId, soloLectura = false }: { empre
       if (!archivo) return;
       setMensaje("Importando costos de Berlín...");
       const data = await parsearExcelCostosDuna(archivo);
-      const resultado = await importarCostosManualesDuna({ empresa_id: empresaId, data });
+      const resultado = await importarCostosManualesDuna({
+        empresa_id: empresaId,
+        data,
+        origen: "excel_berlin",
+      });
       await cargar();
       setMensaje(`Costos importados correctamente: ${resultado.importados} productos.`);
       event.target.value = "";
@@ -78,8 +82,7 @@ export default function CostosBerlin({ empresaId, soloLectura = false }: { empre
       "Precio de referencia": costo.precio_referencia === null
         ? ""
         : Number(costo.precio_referencia),
-      Origen: costo.origen,
-      Estimado: costo.estimado ? "Sí" : "No",
+      Origen: costo.origen === "excel_berlin" ? "Excel Berlín" : costo.origen,
       "Última actualización": costo.updated_at
         ? new Date(costo.updated_at).toLocaleString("es-UY")
         : "",
@@ -88,7 +91,7 @@ export default function CostosBerlin({ empresaId, soloLectura = false }: { empre
     const hoja = XLSX.utils.json_to_sheet(filas);
     hoja["!cols"] = [
       { wch: 42 }, { wch: 16 }, { wch: 16 }, { wch: 20 },
-      { wch: 18 }, { wch: 11 }, { wch: 22 },
+      { wch: 18 }, { wch: 22 },
     ];
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, "Costos Berlín");

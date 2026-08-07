@@ -528,7 +528,11 @@ export function ImportacionesPage() {
 
       if (tipoImportacion === "berlin_costos_excel") {
         const resultado = await parsearExcelCostosDuna(archivo);
-        const importacion = await importarCostosManualesDuna({ empresa_id: empresaId, data: resultado });
+        const importacion = await importarCostosManualesDuna({
+          empresa_id: empresaId,
+          data: resultado,
+          origen: "excel_berlin",
+        });
         await registrarImportacion({ archivo, registros: importacion.importados, usaSucursal: false });
         setMensaje(`Costos Berlín importados: ${importacion.importados} productos.`);
       }

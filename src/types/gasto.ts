@@ -1,6 +1,7 @@
 export type GastoEmpresa = {
   id: string;
   empresa_id: string;
+  sucursal_id: string | null;
   periodo_id: string;
   categoria: string;
   detalle: string | null;
@@ -15,6 +16,7 @@ export type GastoEmpresa = {
 
 export type GastoEmpresaInput = {
   empresa_id: string;
+  sucursal_id?: string | null;
   periodo_id: string;
   categoria: string;
   detalle?: string | null;

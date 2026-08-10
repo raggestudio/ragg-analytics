@@ -205,9 +205,13 @@ export function GastosPage() {
           `gastos-sucursal-seleccionada-${empresaId}`
         );
         setSucursalId(
-          sucursalesActivas.some((sucursal) => sucursal.id === sucursalGuardada)
-            ? sucursalGuardada!
-            : sucursalesActivas[0]?.id || ""
+          sucursalesActivas.length > 1
+            ? sucursalesActivas.some(
+                (sucursal) => sucursal.id === sucursalGuardada
+              )
+              ? sucursalGuardada!
+              : sucursalesActivas[0]?.id || ""
+            : ""
         );
         const periodoGuardado = localStorage.getItem(
           `gastos-periodo-seleccionado-${empresaId}`
@@ -404,14 +408,21 @@ export function GastosPage() {
           ))}
         </select>
         </label>
-        <label style={label}>Sucursal
-        <select style={input} value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}>
-          <option value="">Gastos generales de la empresa</option>
-          {sucursales.map((sucursal) => (
-            <option key={sucursal.id} value={sucursal.id}>{sucursal.nombre}</option>
-          ))}
-        </select>
-        </label>
+        {sucursales.length > 1 && (
+          <label style={label}>Sucursal
+            <select
+              style={input}
+              value={sucursalId}
+              onChange={(event) => setSucursalId(event.target.value)}
+            >
+              {sucursales.map((sucursal) => (
+                <option key={sucursal.id} value={sucursal.id}>
+                  {sucursal.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         </div>
       </section>
 

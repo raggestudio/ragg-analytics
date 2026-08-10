@@ -9,6 +9,9 @@ export type DashboardResumen = {
   costo_total: number;
   margen_total: number;
   margen_porcentaje: number;
+  gastos_total: number;
+  utilidad_neta: number;
+  margen_neto_porcentaje: number;
   productos_vendidos: number;
   pedidos_pedidosya: number;
   ventas_pedidosya: number;
@@ -124,6 +127,19 @@ export async function obtenerDashboardResumen(input: {
     .single();
 
   if (periodoError) throw periodoError;
+
+  const { data: gastosData, error: gastosError } = await supabase.rpc(
+    "obtener_total_gastos_dashboard",
+    {
+      p_empresa_id: input.empresa_id,
+      p_periodo_id: input.periodo_id,
+      p_sucursal_id: input.sucursal_id || null,
+    }
+  );
+
+  if (gastosError) throw gastosError;
+
+  const gastosTotal = Number(gastosData || 0);
 
   let rentabilidadQuery = supabase
     .from("rentabilidad_periodo")
@@ -535,6 +551,7 @@ const costosCanal =
     ventasDirectas - costoProductosLocal,
     0
   );
+  const utilidadNeta = margenTotalAjustado - gastosTotal;
 
   return {
     ventas_totales: ventasTotalesAjustadas,
@@ -545,6 +562,12 @@ const costosCanal =
         ? (margenTotalAjustado /
             ventasTotalesAjustadas) *
           100
+        : 0,
+    gastos_total: gastosTotal,
+    utilidad_neta: utilidadNeta,
+    margen_neto_porcentaje:
+      ventasTotalesAjustadas > 0
+        ? (utilidadNeta / ventasTotalesAjustadas) * 100
         : 0,
     productos_vendidos: rentabilidad?.length || 0,
 
@@ -686,6 +709,11 @@ function sumarResumenes(
   const margenTotal = resumenes.reduce(
     (total, item) => total + Number(item.margen_total || 0), 0
   );
+  const gastosTotal = resumenes.reduce(
+    (total, item) => total + Number(item.gastos_total || 0),
+    0
+  );
+  const utilidadNeta = margenTotal - gastosTotal;
   const costosCanal = resumenes.reduce(
     (total, item) => total + Number(item.costos_canal || 0), 0
   );
@@ -787,6 +815,10 @@ const ventasBrutasPedidosYa =
     margen_total: margenTotal,
     margen_porcentaje:
       ventasTotales > 0 ? (margenTotal / ventasTotales) * 100 : 0,
+    gastos_total: gastosTotal,
+    utilidad_neta: utilidadNeta,
+    margen_neto_porcentaje:
+      ventasTotales > 0 ? (utilidadNeta / ventasTotales) * 100 : 0,
 
     productos_vendidos: resumenes.reduce(
       (total, item) => total + Number(item.productos_vendidos || 0),

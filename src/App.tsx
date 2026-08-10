@@ -37,9 +37,11 @@ function App() {
               <Route element={<RutaPermiso permiso="vinculaciones" />}>
                 <Route path="/vinculaciones" element={<VinculacionesPage />} />
               </Route>
+              <Route element={<RutaPermiso permiso="gastos" />}>
+                <Route path="/gastos" element={<GastosPage />} />
+              </Route>
               <Route element={<RutaAdmin />}>
                 <Route path="/empresas" element={<EmpresasPage />} />
-                <Route path="/gastos" element={<GastosPage />} />
               </Route>
             </Route>
           </Route>

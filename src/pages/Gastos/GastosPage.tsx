@@ -14,6 +14,7 @@ import type { GastoEmpresa } from "../../types/gasto";
 import type { Periodo } from "../../types/periodo";
 import type { Empresa } from "../../types/empresa";
 import type { Sucursal } from "../../types/sucursal";
+import { useAuth } from "../../contexts/AuthContext";
 
 const CATEGORIAS_GENERALES = [
   "Alquiler",
@@ -157,6 +158,7 @@ function periodoPredeterminado(periodos: Periodo[]) {
 }
 
 export function GastosPage() {
+  const { esAdmin } = useAuth();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [empresaId, setEmpresaId] = useState("");
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
@@ -426,7 +428,7 @@ export function GastosPage() {
         </div>
       </section>
 
-      <section style={card}>
+      {esAdmin && <section style={card}>
         <h3>Importar salarios y jornales</h3>
         <p>Subí el CSV mensual generado por el sistema de sueldos. Se contabilizará únicamente la columna <strong>Líquido</strong>. La nómina y los aportes de BPS se registran por separado para no duplicarlos.</p>
         <p>Si volvés a importar el mismo mes, se reemplaza únicamente la importación anterior de salarios; los demás gastos no se modifican.</p>
@@ -436,9 +438,9 @@ export function GastosPage() {
             if (archivo) void importarSueldos(archivo);
             event.currentTarget.value = "";
           }} />
-      </section>
+      </section>}
 
-      <section style={card}>
+      {esAdmin && <section style={card}>
         <h3>{editandoId ? "Editar gasto" : "Registrar gasto"}</h3>
         <p>Para personal eventual o días especiales, elegí <strong>Jornales extras</strong> e ingresá solamente el importe. El detalle y las observaciones son opcionales.</p>
         <div style={formGrid}>
@@ -474,7 +476,7 @@ export function GastosPage() {
           }}>Cancelar</button>}
         </div>
         {mensaje && <p>{mensaje}</p>}
-      </section>
+      </section>}
 
       <section style={card}>
         <h3>Resumen mensual</h3>
@@ -495,13 +497,13 @@ export function GastosPage() {
         {cargando ? <p>Cargando...</p> : gastos.length === 0 ? <p>No hay gastos registrados en este período.</p> : (
           <div style={{ overflowX: "auto" }}>
             <table style={table}>
-              <thead><tr><th>Categoría</th><th>Detalle</th><th>Origen</th><th>Fecha</th><th>Importe</th><th>Observaciones</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Categoría</th><th>Detalle</th><th>Origen</th><th>Fecha</th><th>Importe</th><th>Observaciones</th>{esAdmin && <th>Acciones</th>}</tr></thead>
               <tbody>{gastos.map((gasto) => (
                 <tr key={gasto.id}>
                   <td>{gasto.categoria}</td><td>{gasto.detalle || "-"}</td><td>{gasto.origen === "sueldos_csv" ? "Sistema de sueldos" : "Manual"}</td><td>{gasto.fecha || "-"}</td>
                   <td>{moneda(gasto.monto)}</td><td>{gasto.observaciones || "-"}</td>
-                  <td><div style={actions}><button style={smallButton} onClick={() => editar(gasto)}>Editar</button>
-                    <button style={dangerButton} onClick={() => void borrar(gasto)}>Eliminar</button></div></td>
+                  {esAdmin && <td><div style={actions}><button style={smallButton} onClick={() => editar(gasto)}>Editar</button>
+                    <button style={dangerButton} onClick={() => void borrar(gasto)}>Eliminar</button></div></td>}
                 </tr>
               ))}</tbody>
             </table>

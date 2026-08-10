@@ -31,6 +31,32 @@ export async function obtenerGastosPorPeriodo(input: {
   return (data || []).map(convertir);
 }
 
+export async function obtenerTotalGastosDashboard(input: {
+  empresa_id: string;
+  periodo_ids: string[];
+  sucursal_id?: string | null;
+}): Promise<number> {
+  if (input.periodo_ids.length === 0) return 0;
+
+  const totales = await Promise.all(
+    input.periodo_ids.map(async (periodoId) => {
+      const { data, error } = await supabase.rpc(
+        "obtener_total_gastos_dashboard",
+        {
+          p_empresa_id: input.empresa_id,
+          p_periodo_id: periodoId,
+          p_sucursal_id: input.sucursal_id || null,
+        }
+      );
+
+      if (error) throw error;
+      return Number(data || 0);
+    })
+  );
+
+  return totales.reduce((total, monto) => total + monto, 0);
+}
+
 export async function crearGasto(input: GastoEmpresaInput): Promise<GastoEmpresa> {
   const monto = Number(input.monto);
   if (!Number.isFinite(monto) || monto <= 0) {

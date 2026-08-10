@@ -283,7 +283,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
   forzarActualizacion = false
 ) {
   const claveCache = [
-    "dashboard-cache-v8",
+    "dashboard-cache-v9",
     empresaId,
     periodoId,
     sucursalId || "todas",
@@ -865,6 +865,24 @@ function textoComparacion() {
                 )}
               />
 
+              <Metric
+                title="Gastos operativos"
+                value={moneda(resumen.gastos_total)}
+                variation={textoVariacion(
+                  variacionPorcentual(
+                    resumen.gastos_total,
+                    anterior?.gastos_total
+                  ),
+                  "porcentaje"
+                )}
+                variationColor={colorVariacion(
+                  variacionPorcentual(
+                    resumen.gastos_total,
+                    anterior?.gastos_total
+                  )
+                )}
+              />
+
               {resumen.es_restaurante && (
                 <Metric
                   title="Facturación PedidosYa"
@@ -890,6 +908,50 @@ function textoComparacion() {
                 title="Productos sin revisar"
                 value={resumen.productos_sin_revisar}
               />
+            </div>
+
+            <div
+              style={{
+                ...utilidadNetaCard,
+                borderColor:
+                  resumen.utilidad_neta >= 0 ? "#22c55e" : "#ef4444",
+                background:
+                  resumen.utilidad_neta >= 0 ? "#052e16" : "#450a0a",
+              }}
+            >
+              <span style={utilidadNetaTitulo}>UTILIDAD NETA</span>
+              <strong style={utilidadNetaValor}>
+                {moneda(resumen.utilidad_neta)}
+              </strong>
+              <span>
+                Margen neto: {porcentaje(resumen.margen_neto_porcentaje)}
+              </span>
+              {textoVariacion(
+                variacionPorcentual(
+                  resumen.utilidad_neta,
+                  anterior?.utilidad_neta
+                ),
+                "porcentaje"
+              ) && (
+                <small
+                  style={{
+                    color: colorVariacion(
+                      variacionPorcentual(
+                        resumen.utilidad_neta,
+                        anterior?.utilidad_neta
+                      )
+                    ),
+                  }}
+                >
+                  {textoVariacion(
+                    variacionPorcentual(
+                      resumen.utilidad_neta,
+                      anterior?.utilidad_neta
+                    ),
+                    "porcentaje"
+                  )}
+                </small>
+              )}
             </div>
           </section>
 
@@ -1812,6 +1874,28 @@ const metricCard: React.CSSProperties = {
   border: "1px solid #334155",
   display: "grid",
   gap: 8,
+};
+
+const utilidadNetaCard: React.CSSProperties = {
+  marginTop: 20,
+  padding: 22,
+  borderRadius: 14,
+  border: "2px solid",
+  display: "grid",
+  justifyItems: "center",
+  gap: 8,
+  textAlign: "center",
+};
+
+const utilidadNetaTitulo: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 800,
+  letterSpacing: 1.2,
+};
+
+const utilidadNetaValor: React.CSSProperties = {
+  fontSize: 34,
+  lineHeight: 1.1,
 };
 
 const rankingGrid: React.CSSProperties = {

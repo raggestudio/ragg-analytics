@@ -6,6 +6,7 @@ import {
   type BerlinProductoConfig,
 } from "../../services/berlinService";
 import { nombreProductoBerlin, normalizarProductoBerlin } from "../../services/berlinExcelParsers";
+import { obtenerTotalGastosDashboard } from "../../services/gastosService";
 
 type Vista = "total" | "salon" | "delivery" | "take_away";
 type Props = { empresaId: string; periodoIds: string[]; sucursalId?: string | null };
@@ -22,6 +23,7 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
   const [ventas, setVentas] = useState<any[]>([]);
   const [costos, setCostos] = useState<any[]>([]);
   const [config, setConfig] = useState<BerlinProductoConfig[]>([]);
+  const [gastosTotal, setGastosTotal] = useState(0);
   const [vista, setVista] = useState<Vista>("total");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
   const [mensaje, setMensaje] = useState("Cargando análisis de Berlín...");
@@ -32,9 +34,15 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
       obtenerVentasBerlin({ empresa_id: empresaId, periodo_ids: periodoIds, sucursal_id: sucursalId }),
       obtenerCostosManualesPorEmpresa(empresaId),
       obtenerConfiguracionBerlin(empresaId),
-    ]).then(([ventasData, costosData, configData]) => {
+      obtenerTotalGastosDashboard({
+        empresa_id: empresaId,
+        periodo_ids: periodoIds,
+        sucursal_id: sucursalId,
+      }),
+    ]).then(([ventasData, costosData, configData, gastosData]) => {
       if (!activo) return;
-      setVentas(ventasData); setCostos(costosData); setConfig(configData); setMensaje("");
+      setVentas(ventasData); setCostos(costosData); setConfig(configData);
+      setGastosTotal(gastosData); setMensaje("");
     }).catch((error) => activo && setMensaje(error?.message || "No se pudo cargar Berlín."));
     return () => { activo = false; };
   }, [empresaId, periodoIds.join("|"), sucursalId]);
@@ -93,6 +101,10 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
   const topFacturacion = [...analisis.lista].sort((a, b) => b.facturacion - a.facturacion).slice(0, 10);
   const topMargen = [...analisis.lista].filter((p) => p.tieneCosto && p.facturacion > 0)
     .sort((a, b) => b.ganancia - a.ganancia).slice(0, 10);
+  const utilidadNeta = analisis.ganancia - gastosTotal;
+  const margenNeto = analisis.facturacion > 0
+    ? (utilidadNeta / analisis.facturacion) * 100
+    : 0;
 
   const categoriasDisponibles = [...new Set(analisis.lista.map((p) => p.categoria))]
     .filter((categoria) => categoria && categoria !== "Sin categoría")
@@ -136,6 +148,20 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
         <Metric title="Productos sin costo" value={analisis.sinCosto} />
         <Metric title="Productos sin categoría" value={analisis.sinCategoria} />
       </div>
+      {vista === "total" && <>
+        <div style={metrics}>
+          <Metric title="Gastos operativos" value={moneda(gastosTotal)} />
+        </div>
+        <div style={{
+          ...utilidadCard,
+          borderColor: utilidadNeta >= 0 ? "#22c55e" : "#ef4444",
+          background: utilidadNeta >= 0 ? "#052e16" : "#450a0a",
+        }}>
+          <span style={utilidadTitulo}>UTILIDAD NETA</span>
+          <strong style={utilidadValor}>{moneda(utilidadNeta)}</strong>
+          <span>Margen neto: {margenNeto.toFixed(1)}%</span>
+        </div>
+      </>}
       {analisis.sinCosto > 0 && <p style={{ color: "#fbbf24" }}>
         El margen es provisorio: faltan costos para {analisis.sinCosto} productos. Completalos en Vinculaciones.
       </p>}
@@ -211,3 +237,6 @@ const row: React.CSSProperties = { display: "grid", gridTemplateColumns: "2fr re
 const rankingRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "2.3fr repeat(5, 1fr)", gap: 12, padding: "10px 0", borderBottom: "1px solid #334155", alignItems: "center" };
 const headerRow: React.CSSProperties = { color: "#cbd5e1", borderBottom: "2px solid #64748b" };
 const tableWrap: React.CSSProperties = { overflowX: "auto", minWidth: 760 };
+const utilidadCard: React.CSSProperties = { marginTop: 18, padding: 24, border: "2px solid", borderRadius: 14, display: "grid", justifyItems: "center", gap: 8, textAlign: "center" };
+const utilidadTitulo: React.CSSProperties = { fontSize: 18, fontWeight: 800, letterSpacing: 1 };
+const utilidadValor: React.CSSProperties = { fontSize: 34 };

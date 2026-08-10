@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { obtenerEmpresas } from "../../services/empresaService";
 import { obtenerSucursalesPorEmpresa } from "../../services/sucursalService";
-import { obtenerPeriodosPorEmpresa } from "../../services/periodoService";
+import { obtenerPeriodosConDatosPorEmpresa } from "../../services/periodoService";
 import { SaboresPedidosYa } from "../../components/dashboard/SaboresPedidosYa";
 import { RentabilidadSaboresPedidosYa } from "../../components/dashboard/RentabilidadSaboresPedidosYa";
 
@@ -169,7 +169,7 @@ useEffect(() => {
   setEmpresaId(empresa.id);
 
       const sucursalesData = await obtenerSucursalesPorEmpresa(empresa.id);
-      const periodosData = await obtenerPeriodosPorEmpresa(empresa.id);
+      const periodosData = await obtenerPeriodosConDatosPorEmpresa(empresa.id);
 
       setSucursales(sucursalesData);
       setPeriodos(periodosData);
@@ -200,7 +200,7 @@ const actualId =
     setSucursalId("");
 
     const sucursalesData = await obtenerSucursalesPorEmpresa(id);
-    const periodosData = await obtenerPeriodosPorEmpresa(id);
+    const periodosData = await obtenerPeriodosConDatosPorEmpresa(id);
 
     setSucursales(sucursalesData);
     setPeriodos(periodosData);

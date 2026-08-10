@@ -1,4 +1,4 @@
-import { obtenerPeriodosPorEmpresa } from "../../services/periodoService";
+import { obtenerPeriodosConDatosPorEmpresa } from "../../services/periodoService";
 import type { Periodo } from "../../types/periodo";
 import { useEffect, useState } from "react";
 import { obtenerEmpresas } from "../../services/empresaService";
@@ -93,7 +93,7 @@ export function ProductosPage() {
 
   setEmpresaId(empresaInicialId);
 
-  const periodosData = await obtenerPeriodosPorEmpresa(empresaInicialId);
+  const periodosData = await obtenerPeriodosConDatosPorEmpresa(empresaInicialId);
   setPeriodos(periodosData);
 
   const periodoGuardadoId = localStorage.getItem(
@@ -221,7 +221,7 @@ console.log("PRODUCTOS - RENTABILIDAD", filas);
   async function cambiarEmpresa(id: string) {
   setEmpresaId(id);
 
-  const periodosData = await obtenerPeriodosPorEmpresa(id);
+  const periodosData = await obtenerPeriodosConDatosPorEmpresa(id);
   setPeriodos(periodosData);
 
   const periodoGuardadoId = localStorage.getItem(

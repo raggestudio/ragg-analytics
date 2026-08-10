@@ -13,7 +13,7 @@ import type { GastoEmpresa } from "../../types/gasto";
 import type { Periodo } from "../../types/periodo";
 import type { Empresa } from "../../types/empresa";
 
-const CATEGORIAS = [
+const CATEGORIAS_GENERALES = [
   "Alquiler",
   "Luz",
   "Agua",
@@ -33,6 +33,52 @@ const CATEGORIAS = [
   "Gastos extras",
   "Otros gastos",
 ] as const;
+
+const CATEGORIAS_DUNA = [
+  "Tarifa de saneamiento",
+  "Entarimado",
+  "Tributos domiciliarios",
+  "Adicional Mercantil",
+  "Inst Mec y Eléctricas",
+  "Alquiler",
+  "UTE",
+  "OSE",
+  "ANTEL fija",
+  "ANTEL Móvil",
+  "Seguros",
+  "SEMM",
+  "Residuos",
+  "Exterminex",
+  "ADT",
+  "BPS",
+  "DGI/IRAE IVA",
+  "SUELDOS LIQ",
+  "New age Data",
+  "Comisión tarjetas",
+  "Comisiones bancarias",
+  "Leña",
+  "Productos limpieza",
+  "GAS",
+  "CO2",
+  "Bandas DJS/proyector",
+  "Mantenimiento",
+  "Contadores",
+  "Marketing + Publicidad",
+  "PedidosYa",
+  "Otros Jornales",
+  "Otros",
+] as const;
+
+function categoriasParaEmpresa(empresa?: Empresa) {
+  const nombre = String(empresa?.nombre || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  return nombre.includes("duna")
+    ? CATEGORIAS_DUNA
+    : CATEGORIAS_GENERALES;
+}
 
 type Formulario = {
   categoria: string;
@@ -90,6 +136,8 @@ export function GastosPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(true);
+  const empresaActual = empresas.find((empresa) => empresa.id === empresaId);
+  const categoriasDisponibles = categoriasParaEmpresa(empresaActual);
 
   useEffect(() => {
     obtenerEmpresas()
@@ -113,11 +161,38 @@ export function GastosPage() {
       .then((data) => {
         const ordenados = [...data].sort((a, b) => b.anio - a.anio || b.mes - a.mes);
         setPeriodos(ordenados);
-        setPeriodoId(periodoPredeterminado(ordenados));
+        const periodoGuardado = localStorage.getItem(
+          `gastos-periodo-seleccionado-${empresaId}`
+        );
+        const periodoInicial = ordenados.some(
+          (periodo) => periodo.id === periodoGuardado
+        )
+          ? periodoGuardado!
+          : periodoPredeterminado(ordenados);
+        setPeriodoId(periodoInicial);
       })
       .catch((error) => setMensaje(error?.message || "No se pudieron cargar los períodos."))
       .finally(() => setCargando(false));
   }, [empresaId]);
+
+  useEffect(() => {
+    if (!empresaId || !periodoId) return;
+    localStorage.setItem(
+      `gastos-periodo-seleccionado-${empresaId}`,
+      periodoId
+    );
+  }, [empresaId, periodoId]);
+
+  useEffect(() => {
+    if (editandoId || categoriasDisponibles.includes(
+      formulario.categoria as never
+    )) return;
+
+    setFormulario((actual) => ({
+      ...actual,
+      categoria: categoriasDisponibles[0],
+    }));
+  }, [categoriasDisponibles, editandoId, formulario.categoria]);
 
   useEffect(() => {
     if (!periodoId) {
@@ -276,7 +351,7 @@ export function GastosPage() {
         <div style={formGrid}>
           <label style={label}>Categoría
             <select style={input} value={formulario.categoria} onChange={(e) => cambiar("categoria", e.target.value)}>
-              {CATEGORIAS.map((categoria) => <option key={categoria}>{categoria}</option>)}
+              {categoriasDisponibles.map((categoria) => <option key={categoria}>{categoria}</option>)}
             </select>
           </label>
           <label style={label}>Importe

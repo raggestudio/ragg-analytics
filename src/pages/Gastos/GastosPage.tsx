@@ -69,15 +69,43 @@ const CATEGORIAS_DUNA = [
   "Otros",
 ] as const;
 
+const CATEGORIAS_PIU = [
+  "Alquiler",
+  "OSE",
+  "UTE",
+  "ANTEL",
+  "Redes",
+  "Empresa plagas",
+  "Comisión tarjetas",
+  "POS",
+  "Tributos Dom.",
+  "BPS",
+  "DGI",
+  "Contabilidad",
+  "Saneamiento",
+  "Papelería",
+  "BSE",
+  "Sueldos",
+  "Aguinaldos",
+  "Licencias",
+  "Otros",
+  "Alarma",
+  "Recolección basura",
+  "Isatech",
+  "Seguro",
+  "Flete helado",
+] as const;
+
 function categoriasParaEmpresa(empresa?: Empresa) {
   const nombre = String(empresa?.nombre || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-  return nombre.includes("duna")
-    ? CATEGORIAS_DUNA
-    : CATEGORIAS_GENERALES;
+  if (nombre.includes("duna")) return CATEGORIAS_DUNA;
+if (nombre.includes("piu")) return CATEGORIAS_PIU;
+
+return CATEGORIAS_GENERALES;
 }
 
 type Formulario = {

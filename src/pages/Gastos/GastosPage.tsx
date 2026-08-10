@@ -9,9 +9,11 @@ import {
 import { leerCsvSueldos } from "../../services/sueldosGastosParser";
 import { obtenerEmpresas } from "../../services/empresaService";
 import { obtenerPeriodosPorEmpresa } from "../../services/periodoService";
+import { obtenerSucursalesPorEmpresa } from "../../services/sucursalService";
 import type { GastoEmpresa } from "../../types/gasto";
 import type { Periodo } from "../../types/periodo";
 import type { Empresa } from "../../types/empresa";
+import type { Sucursal } from "../../types/sucursal";
 
 const CATEGORIAS_GENERALES = [
   "Alquiler",
@@ -69,15 +71,43 @@ const CATEGORIAS_DUNA = [
   "Otros",
 ] as const;
 
+const CATEGORIAS_PIU = [
+  "Alquiler",
+  "OSE",
+  "UTE",
+  "ANTEL",
+  "Redes",
+  "Empresa plagas",
+  "Comisión tarjetas",
+  "POS",
+  "Tributos Dom.",
+  "BPS",
+  "DGI",
+  "Contabilidad",
+  "Saneamiento",
+  "Papelería",
+  "BSE",
+  "Sueldos",
+  "Aguinaldos",
+  "Licencias",
+  "Otros",
+  "Alarma",
+  "Recolección basura",
+  "Isatech",
+  "Seguro",
+  "Flete helado",
+] as const;
+
 function categoriasParaEmpresa(empresa?: Empresa) {
   const nombre = String(empresa?.nombre || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-  return nombre.includes("duna")
-    ? CATEGORIAS_DUNA
-    : CATEGORIAS_GENERALES;
+  if (nombre.includes("duna")) return CATEGORIAS_DUNA;
+  if (nombre.includes("piu")) return CATEGORIAS_PIU;
+
+  return CATEGORIAS_GENERALES;
 }
 
 type Formulario = {
@@ -131,6 +161,8 @@ export function GastosPage() {
   const [empresaId, setEmpresaId] = useState("");
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [periodoId, setPeriodoId] = useState("");
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [sucursalId, setSucursalId] = useState("");
   const [gastos, setGastos] = useState<GastoEmpresa[]>([]);
   const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VACIO);
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -155,12 +187,28 @@ export function GastosPage() {
     if (!empresaId) return;
     localStorage.setItem("gastos-empresa-seleccionada", empresaId);
     setPeriodoId("");
+    setSucursalId("");
     setGastos([]);
     setCargando(true);
-    obtenerPeriodosPorEmpresa(empresaId)
-      .then((data) => {
+    Promise.all([
+      obtenerPeriodosPorEmpresa(empresaId),
+      obtenerSucursalesPorEmpresa(empresaId),
+    ])
+      .then(([data, sucursalesData]) => {
         const ordenados = [...data].sort((a, b) => b.anio - a.anio || b.mes - a.mes);
         setPeriodos(ordenados);
+        const sucursalesActivas = sucursalesData.filter(
+          (sucursal) => sucursal.activa !== false
+        );
+        setSucursales(sucursalesActivas);
+        const sucursalGuardada = localStorage.getItem(
+          `gastos-sucursal-seleccionada-${empresaId}`
+        );
+        setSucursalId(
+          sucursalesActivas.some((sucursal) => sucursal.id === sucursalGuardada)
+            ? sucursalGuardada!
+            : sucursalesActivas[0]?.id || ""
+        );
         const periodoGuardado = localStorage.getItem(
           `gastos-periodo-seleccionado-${empresaId}`
         );
@@ -174,6 +222,14 @@ export function GastosPage() {
       .catch((error) => setMensaje(error?.message || "No se pudieron cargar los períodos."))
       .finally(() => setCargando(false));
   }, [empresaId]);
+
+  useEffect(() => {
+    if (!empresaId) return;
+    localStorage.setItem(
+      `gastos-sucursal-seleccionada-${empresaId}`,
+      sucursalId
+    );
+  }, [empresaId, sucursalId]);
 
   useEffect(() => {
     if (!empresaId || !periodoId) return;
@@ -200,11 +256,15 @@ export function GastosPage() {
       return;
     }
     setCargando(true);
-    obtenerGastosPorPeriodo({ empresa_id: empresaId, periodo_id: periodoId })
+    obtenerGastosPorPeriodo({
+      empresa_id: empresaId,
+      periodo_id: periodoId,
+      sucursal_id: sucursalId || null,
+    })
       .then(setGastos)
       .catch((error) => setMensaje(error?.message || "No se pudieron cargar los gastos."))
       .finally(() => setCargando(false));
-  }, [empresaId, periodoId]);
+  }, [empresaId, periodoId, sucursalId]);
 
   const total = useMemo(
     () => gastos.reduce((suma, gasto) => suma + gasto.monto, 0),
@@ -230,6 +290,7 @@ export function GastosPage() {
       setMensaje("Guardando...");
       const input = {
         empresa_id: empresaId,
+        sucursal_id: sucursalId || null,
         periodo_id: periodoId,
         categoria: formulario.categoria,
         detalle: formulario.detalle,
@@ -243,7 +304,11 @@ export function GastosPage() {
 
       setFormulario(FORMULARIO_VACIO);
       setEditandoId(null);
-      setGastos(await obtenerGastosPorPeriodo({ empresa_id: empresaId, periodo_id: periodoId }));
+      setGastos(await obtenerGastosPorPeriodo({
+        empresa_id: empresaId,
+        periodo_id: periodoId,
+        sucursal_id: sucursalId || null,
+      }));
       setMensaje(editandoId ? "Gasto actualizado." : "Gasto registrado.");
     } catch (error: any) {
       setMensaje(error?.message || "No se pudo guardar el gasto.");
@@ -303,8 +368,17 @@ export function GastosPage() {
         return;
       }
 
-      const cantidad = await reemplazarSalariosDesdeCsv({ empresa_id: empresaId, periodo_id: periodoId, filas });
-      setGastos(await obtenerGastosPorPeriodo({ empresa_id: empresaId, periodo_id: periodoId }));
+      const cantidad = await reemplazarSalariosDesdeCsv({
+        empresa_id: empresaId,
+        periodo_id: periodoId,
+        sucursal_id: sucursalId || null,
+        filas,
+      });
+      setGastos(await obtenerGastosPorPeriodo({
+        empresa_id: empresaId,
+        periodo_id: periodoId,
+        sucursal_id: sucursalId || null,
+      }));
       setMensaje(`Sueldos importados correctamente: ${cantidad} empleados · ${moneda(totalLiquido)} de salarios líquidos.`);
     } catch (error: any) {
       setMensaje(error?.message || "No se pudo importar el archivo de sueldos.");
@@ -327,6 +401,14 @@ export function GastosPage() {
         <select style={input} value={periodoId} onChange={(event) => setPeriodoId(event.target.value)}>
           {periodos.map((periodo) => (
             <option key={periodo.id} value={periodo.id}>{periodo.nombre}</option>
+          ))}
+        </select>
+        </label>
+        <label style={label}>Sucursal
+        <select style={input} value={sucursalId} onChange={(event) => setSucursalId(event.target.value)}>
+          <option value="">Gastos generales de la empresa</option>
+          {sucursales.map((sucursal) => (
+            <option key={sucursal.id} value={sucursal.id}>{sucursal.nombre}</option>
           ))}
         </select>
         </label>

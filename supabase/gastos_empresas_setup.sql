@@ -19,9 +19,13 @@ create table if not exists public.gastos_empresa (
 
 alter table public.gastos_empresa add column if not exists origen text not null default 'manual';
 alter table public.gastos_empresa add column if not exists referencia text null;
+alter table public.gastos_empresa add column if not exists sucursal_id uuid null references public.sucursales(id) on delete set null;
 
 create index if not exists gastos_empresa_periodo_idx
   on public.gastos_empresa (empresa_id, periodo_id);
+
+create index if not exists gastos_empresa_sucursal_periodo_idx
+  on public.gastos_empresa (empresa_id, sucursal_id, periodo_id);
 
 alter table public.gastos_empresa enable row level security;
 
@@ -50,6 +54,7 @@ create policy gastos_empresa_admin_delete on public.gastos_empresa
 create or replace function public.reemplazar_salarios_gastos(
   p_empresa_id uuid,
   p_periodo_id uuid,
+  p_sucursal_id uuid,
   p_filas jsonb
 )
 returns integer
@@ -71,17 +76,26 @@ begin
     raise exception 'El período no pertenece a la empresa seleccionada';
   end if;
 
+  if p_sucursal_id is not null and not exists (
+    select 1 from public.sucursales
+    where id = p_sucursal_id and empresa_id = p_empresa_id
+  ) then
+    raise exception 'La sucursal no pertenece a la empresa seleccionada';
+  end if;
+
   delete from public.gastos_empresa
   where empresa_id = p_empresa_id
     and periodo_id = p_periodo_id
+    and sucursal_id is not distinct from p_sucursal_id
     and origen = 'sueldos_csv';
 
   insert into public.gastos_empresa (
-    empresa_id, periodo_id, categoria, detalle, monto,
+    empresa_id, sucursal_id, periodo_id, categoria, detalle, monto,
     observaciones, origen, referencia, created_by
   )
   select
     p_empresa_id,
+    p_sucursal_id,
     p_periodo_id,
     'Salarios y jornales',
     x.nombre,
@@ -114,4 +128,4 @@ begin
 end;
 $$;
 
-grant execute on function public.reemplazar_salarios_gastos(uuid, uuid, jsonb) to authenticated;
+grant execute on function public.reemplazar_salarios_gastos(uuid, uuid, uuid, jsonb) to authenticated;

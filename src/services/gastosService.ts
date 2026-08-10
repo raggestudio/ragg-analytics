@@ -11,12 +11,19 @@ function convertir(fila: any): GastoEmpresa {
 export async function obtenerGastosPorPeriodo(input: {
   empresa_id: string;
   periodo_id: string;
+  sucursal_id?: string | null;
 }): Promise<GastoEmpresa[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("gastos_empresa")
     .select("*")
     .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id)
+    .eq("periodo_id", input.periodo_id);
+
+  query = input.sucursal_id
+    ? query.eq("sucursal_id", input.sucursal_id)
+    : query.is("sucursal_id", null);
+
+  const { data, error } = await query
     .order("fecha", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
@@ -34,6 +41,7 @@ export async function crearGasto(input: GastoEmpresaInput): Promise<GastoEmpresa
     .from("gastos_empresa")
     .insert({
       empresa_id: input.empresa_id,
+      sucursal_id: input.sucursal_id || null,
       periodo_id: input.periodo_id,
       categoria: input.categoria,
       detalle: input.detalle?.trim() || null,
@@ -53,11 +61,13 @@ export async function crearGasto(input: GastoEmpresaInput): Promise<GastoEmpresa
 export async function reemplazarSalariosDesdeCsv(input: {
   empresa_id: string;
   periodo_id: string;
+  sucursal_id?: string | null;
   filas: SueldoGastoImportado[];
 }) {
   const { data, error } = await supabase.rpc("reemplazar_salarios_gastos", {
     p_empresa_id: input.empresa_id,
     p_periodo_id: input.periodo_id,
+    p_sucursal_id: input.sucursal_id || null,
     p_filas: input.filas,
   });
 
@@ -78,6 +88,7 @@ export async function actualizarGasto(
     .from("gastos_empresa")
     .update({
       categoria: input.categoria,
+      sucursal_id: input.sucursal_id || null,
       detalle: input.detalle?.trim() || null,
       monto,
       fecha: input.fecha || null,

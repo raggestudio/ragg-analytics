@@ -1049,11 +1049,6 @@ export function ImportacionesPage() {
         ) : (
           <>
             <EstadoItem
-              label="PedidosYa orderDetails"
-              tipo="pedidosya_order_details_csv"
-              usaSucursal
-            />
-            <EstadoItem
               label="PedidosYa resumen diario"
               tipo="pedidosya_csv"
               usaSucursal
@@ -1101,8 +1096,9 @@ export function ImportacionesPage() {
             <p>Verificando información importada...</p>
           ) : !conciliacionPiu || conciliacionPiu.estado === "pendiente" ? (
             <p style={hint}>
-              Pendiente: importá el orderDetails de PedidosYa y el PDF de
-              Isatech del mismo período y sucursal para realizar el control.
+              La conciliación se realizará automáticamente cuando estén
+              disponibles los datos de PedidosYa e Isatech del mismo período
+              y sucursal.
             </p>
           ) : (
             <>

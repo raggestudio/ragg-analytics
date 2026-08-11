@@ -91,12 +91,8 @@ type OpcionImportacion = {
 
 const OPCIONES_HELADERIA: OpcionImportacion[] = [
   {
-    value: "pedidosya_order_details_csv",
-    label: "PedidosYa orderDetails CSV",
-  },
-  {
     value: "pedidosya_sabores_csv",
-    label: "PedidosYa detalle de sabores CSV",
+    label: "PedidosYa detalle y sabores CSV",
   },
   {
     value: "pedidosya_csv",
@@ -617,6 +613,21 @@ export function ImportacionesPage() {
       }
 
       if (tipoImportacion === "pedidosya_sabores_csv") {
+        const preview = await leerCsv(archivo);
+        setCsvFilas(preview.filas);
+
+        const pedidos = parsearFilasOrderDetailsPedidosYa(preview.filas);
+
+        const resultadoPedidos = await reemplazarOrderDetailsPedidosYa({
+          empresa_id: empresaId,
+          sucursal_id: sucursalId,
+          periodo_id: periodo.id,
+          periodo_anio: periodo.anio,
+          periodo_mes: periodo.mes,
+          turno: "general",
+          pedidos,
+        });
+
         const resultado = await leerCsvSaboresPedidosYa(
           archivo,
           {
@@ -640,7 +651,9 @@ export function ImportacionesPage() {
         });
 
         setMensaje(
-          `Detalle de sabores PedidosYa importado: ` +
+          `Detalle PedidosYa importado: ` +
+            `${resultadoPedidos.pedidos_importados} pedidos, ` +
+            `${resultadoPedidos.productos_importados} líneas de productos, ` +
             `${resultado.sabores.length} sabores y ` +
             `${resultado.selecciones_totales} selecciones.`
         );
@@ -917,7 +930,7 @@ export function ImportacionesPage() {
 }
 
   return (
-    <div>
+    <div style={page}>
       <h2>Importaciones</h2>
 
       <section style={card}>
@@ -1054,7 +1067,7 @@ export function ImportacionesPage() {
               usaSucursal
             />
             <EstadoItem
-              label="PedidosYa detalle de sabores"
+              label="PedidosYa detalle y sabores"
               tipo="pedidosya_sabores_csv"
               usaSucursal
             />
@@ -1147,8 +1160,8 @@ export function ImportacionesPage() {
               </div>
 
               {conciliacionPiu.detalle.length > 0 && (
-                <div style={{ overflowX: "auto", marginTop: 20 }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div style={tablaConciliacionContenedor}>
+                  <table style={tablaConciliacion}>
                     <thead>
                       <tr>
                         <th style={celda}>Producto agrupado</th>
@@ -1272,6 +1285,17 @@ const card: React.CSSProperties = {
   padding: 24,
   marginTop: 20,
   borderRadius: 16,
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
+  overflow: "hidden",
+};
+
+const page: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
 };
 
 const label: React.CSSProperties = {
@@ -1327,9 +1351,11 @@ const estadoItem: React.CSSProperties = {
 
 const resumenGrid: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))",
   gap: 12,
   marginBottom: 24,
+  width: "100%",
+  minWidth: 0,
 };
 
 const resumenBox: React.CSSProperties = {
@@ -1339,12 +1365,30 @@ const resumenBox: React.CSSProperties = {
   display: "grid",
   gap: 8,
   textAlign: "center",
+  minWidth: 0,
+  overflowWrap: "anywhere",
+};
+
+const tablaConciliacionContenedor: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+  overflowX: "auto",
+  marginTop: 20,
+};
+
+const tablaConciliacion: React.CSSProperties = {
+  width: "100%",
+  minWidth: 620,
+  borderCollapse: "collapse",
+  tableLayout: "fixed",
 };
 
 const celda: React.CSSProperties = {
   padding: "10px 8px",
   borderBottom: "1px solid #334155",
   textAlign: "left",
+  overflowWrap: "anywhere",
 };
 
 const tableHeader: React.CSSProperties = {

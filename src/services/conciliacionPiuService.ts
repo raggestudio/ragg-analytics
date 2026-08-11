@@ -85,7 +85,16 @@ function nombreGrupo(nombreRaw: unknown) {
 function esProductoPedidosYaIsatech(fila: Record<string, unknown>) {
   const codigo = normalizar(fila.codigo_producto);
   const categoria = normalizar(fila.categoria);
-  return categoria.includes("pedidos ya") || /^py/.test(codigo) || /^propy/.test(codigo);
+  const nombre = normalizar(fila.nombre_producto);
+
+  return (
+    nombre.includes("pedido ya") ||
+    nombre.includes("pedidos ya") ||
+    categoria.includes("pedido ya") ||
+    categoria.includes("pedidos ya") ||
+    /^py/.test(codigo) ||
+    /^propy/.test(codigo)
+  );
 }
 
 function sumarPorGrupo(

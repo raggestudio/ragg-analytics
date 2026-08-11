@@ -1219,31 +1219,35 @@ export function ImportacionesPage() {
             </div>
           </div>
 
-          <div style={tableHeader}>
-            <strong>Canal</strong>
-            <strong>Producto</strong>
-            <strong>Venta</strong>
-            <strong>Costo</strong>
-            <strong>Comisión/canal</strong>
-            <strong>Margen</strong>
-            <strong>%</strong>
-          </div>
+          <div style={tablaRentabilidadContenedor}>
+            <div style={tablaRentabilidadInterior}>
+              <div style={tableHeader}>
+                <strong>Canal</strong>
+                <strong>Producto</strong>
+                <strong>Venta</strong>
+                <strong>Costo</strong>
+                <strong>Comisión/canal</strong>
+                <strong>Margen</strong>
+                <strong>%</strong>
+              </div>
 
-          {rentabilidad.map((item) => (
-            <div key={item.id} style={tableRow}>
-              <span>
-                {esRestaurante()
-                  ? item.canal || "Paradise"
-                  : "Isatech"}
-              </span>
-              <span>{item.nombre_producto}</span>
-              <span>{moneda(item.ventas)}</span>
-              <span>{moneda(item.costo_total)}</span>
-              <span>{moneda(Number(item.comision || 0))}</span>
-              <span>{moneda(item.margen)}</span>
-              <span>{porcentaje(item.margen_porcentaje)}</span>
+              {rentabilidad.map((item) => (
+                <div key={item.id} style={tableRow}>
+                  <span>
+                    {esRestaurante()
+                      ? item.canal || "Paradise"
+                      : "Isatech"}
+                  </span>
+                  <span>{item.nombre_producto}</span>
+                  <span>{moneda(item.ventas)}</span>
+                  <span>{moneda(item.costo_total)}</span>
+                  <span>{moneda(Number(item.comision || 0))}</span>
+                  <span>{moneda(item.margen)}</span>
+                  <span>{porcentaje(item.margen_porcentaje)}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </section>
       )}
 
@@ -1296,6 +1300,8 @@ const page: React.CSSProperties = {
   width: "100%",
   maxWidth: "100%",
   minWidth: 0,
+  overflowX: "hidden",
+  boxSizing: "border-box",
 };
 
 const label: React.CSSProperties = {
@@ -1312,6 +1318,8 @@ const input: React.CSSProperties = {
   padding: 12,
   marginBottom: 12,
   borderRadius: 8,
+  maxInlineSize: "100%",
+  boxSizing: "border-box",
 };
 
 const hint: React.CSSProperties = {
@@ -1344,6 +1352,8 @@ const pre: React.CSSProperties = {
 
 const estadoItem: React.CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
+  gap: 10,
   justifyContent: "space-between",
   padding: "10px 0",
   borderBottom: "1px solid #334155",
@@ -1382,6 +1392,18 @@ const tablaConciliacion: React.CSSProperties = {
   minWidth: 620,
   borderCollapse: "collapse",
   tableLayout: "fixed",
+};
+
+const tablaRentabilidadContenedor: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+  overflowX: "auto",
+};
+
+const tablaRentabilidadInterior: React.CSSProperties = {
+  width: "100%",
+  minWidth: 760,
 };
 
 const celda: React.CSSProperties = {

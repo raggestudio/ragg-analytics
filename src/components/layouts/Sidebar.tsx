@@ -23,5 +23,14 @@ function MenuItem({ to, children }: { to: string; children: React.ReactNode }) {
   return <NavLink to={to} style={({ isActive }) => ({ display: "block", padding: 16, marginBottom: 10, borderRadius: 12, textDecoration: "none", textAlign: "center", color: "white", fontWeight: 600, background: isActive ? "#2563eb" : "transparent" })}>{children}</NavLink>;
 }
 
-const sidebar: React.CSSProperties = { width: 260, minHeight: "100vh", background: "#020617", padding: 24, color: "white" };
+const sidebar: React.CSSProperties = {
+  width: 260,
+  minWidth: 260,
+  flexShrink: 0,
+  minHeight: "100vh",
+  boxSizing: "border-box",
+  background: "#020617",
+  padding: 24,
+  color: "white",
+};
 const modo: React.CSSProperties = { margin: "0 0 24px", color: "#93c5fd", fontSize: 13 };

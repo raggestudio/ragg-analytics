@@ -41,8 +41,9 @@ function normalizar(valor: unknown) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\[[^\]]*]/g, " ")
-    .replace(/\([^)]*\)/g, " ")
+    // Conserva el contenido de opciones y complementos. En PedidosYa la
+    // promoción de 1/4 aparece con los alfajores dentro del mismo detalle.
+    .replace(/[\[\](){}]/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -63,16 +64,27 @@ function esPedidoContabilizable(estadoRaw: unknown) {
 function nombreGrupo(nombreRaw: unknown) {
   const nombre = normalizar(nombreRaw);
 
-  if (/promo.*(?:1 4|cuarto).*(?:alfajor|2)/.test(nombre)) {
+  const contieneCuarto = /(?:1 4|cuarto litro)/.test(nombre);
+  const contieneAlfajor = /(?:alfajor|\balfa\b)/.test(nombre);
+
+  // PedidosYa lo informa como "1 1/4 l helado + 2 alfajores gf", mientras
+  // que Isatech lo denomina "Promo 1/4 + 2 alfajores".
+  if (
+    contieneCuarto &&
+    contieneAlfajor &&
+    (/(?:promo|promocion)/.test(nombre) || /(?:\+| 2 )/.test(` ${nombre} `))
+  ) {
     return "Promo 1/4 + 2 alfajores";
   }
   if (/cucurucho.*(?:relleno|dulce de leche|ddl)/.test(nombre)) {
     return "Cucurucho relleno";
   }
-  if (/(?:cubanito|barquillo).*(?:relleno|dulce de leche|ddl)/.test(nombre)) {
-    return "Barquillo/Cubanito relleno";
+  // En Isatech aparecen variantes como "cubanito bañado por PY" y en
+  // PedidosYa como "barquillo relleno". Comercialmente son el mismo ítem.
+  if (/(?:cubanito|barquillo)/.test(nombre)) {
+    return "Barquillos/Cubanitos";
   }
-  if (/alfajor/.test(nombre)) return "Alfajores";
+  if (/(?:alfajor|\balfa\b)/.test(nombre)) return "Alfajores";
   if (/capelina/.test(nombre)) return "Capelina";
   if (/cucurucho/.test(nombre)) return "Cucurucho";
   if (/(?:1 4|cuarto litro)/.test(nombre)) return "Helado 1/4 L";

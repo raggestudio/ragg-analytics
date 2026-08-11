@@ -57,6 +57,10 @@ import {
   leerInfoClubBerlin,
 } from "../../services/berlinExcelParsers";
 import { reemplazarVentasBerlin } from "../../services/berlinService";
+import {
+  calcularYGuardarConciliacionPiu,
+  type ConciliacionPiu,
+} from "../../services/conciliacionPiuService";
 
 const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
@@ -86,6 +90,10 @@ type OpcionImportacion = {
 };
 
 const OPCIONES_HELADERIA: OpcionImportacion[] = [
+  {
+    value: "pedidosya_order_details_csv",
+    label: "PedidosYa orderDetails CSV",
+  },
   {
     value: "pedidosya_sabores_csv",
     label: "PedidosYa detalle de sabores CSV",
@@ -170,6 +178,9 @@ export function ImportacionesPage() {
   const [calculando, setCalculando] = useState(false);
   const [rentabilidad, setRentabilidad] =
     useState<RentabilidadConCanal[]>([]);
+  const [conciliacionPiu, setConciliacionPiu] =
+    useState<ConciliacionPiu | null>(null);
+  const [cargandoConciliacion, setCargandoConciliacion] = useState(false);
   const calculandoRef = useRef(false);
 
   useEffect(() => {
@@ -217,6 +228,10 @@ export function ImportacionesPage() {
       cargarRentabilidad();
     }
   }, [empresaId, periodoId, sucursalId]);
+
+  useEffect(() => {
+    void cargarConciliacionPiu();
+  }, [empresaId, periodoId, sucursalId, empresas]);
 
   async function cargarEmpresas() {
     const data = await obtenerEmpresas();
@@ -315,6 +330,28 @@ export function ImportacionesPage() {
     });
 
     setRentabilidad(data as RentabilidadConCanal[]);
+  }
+
+  async function cargarConciliacionPiu() {
+    if (!empresaId || !periodoId || !sucursalId || esBerlin() || esRestaurante()) {
+      setConciliacionPiu(null);
+      return;
+    }
+
+    try {
+      setCargandoConciliacion(true);
+      const resultado = await calcularYGuardarConciliacionPiu({
+        empresa_id: empresaId,
+        sucursal_id: sucursalId,
+        periodo_id: periodoId,
+      });
+      setConciliacionPiu(resultado);
+    } catch (error) {
+      console.error("Error calculando conciliación PIU:", error);
+      setConciliacionPiu(null);
+    } finally {
+      setCargandoConciliacion(false);
+    }
   }
 
   function periodoActual() {
@@ -817,6 +854,7 @@ export function ImportacionesPage() {
       }
 
       await cargarImportaciones(empresaId);
+      await cargarConciliacionPiu();
       e.target.value = "";
     } catch (error: any) {
       console.error(error);
@@ -1011,6 +1049,11 @@ export function ImportacionesPage() {
         ) : (
           <>
             <EstadoItem
+              label="PedidosYa orderDetails"
+              tipo="pedidosya_order_details_csv"
+              usaSucursal
+            />
+            <EstadoItem
               label="PedidosYa resumen diario"
               tipo="pedidosya_csv"
               usaSucursal
@@ -1049,6 +1092,99 @@ export function ImportacionesPage() {
     : "Recalcular análisis"}
 </button>
       </section>
+
+      {!esBerlin() && !esRestaurante() && (
+        <section style={card}>
+          <h3>Conciliación PedidosYa vs. Isatech</h3>
+
+          {cargandoConciliacion ? (
+            <p>Verificando información importada...</p>
+          ) : !conciliacionPiu || conciliacionPiu.estado === "pendiente" ? (
+            <p style={hint}>
+              Pendiente: importá el orderDetails de PedidosYa y el PDF de
+              Isatech del mismo período y sucursal para realizar el control.
+            </p>
+          ) : (
+            <>
+              <div style={resumenGrid}>
+                <div style={resumenBox}>
+                  <strong>Estado</strong>
+                  <span>
+                    {conciliacionPiu.estado === "coincide"
+                      ? "🟢 Coincide"
+                      : conciliacionPiu.estado === "diferencia_menor"
+                        ? "🟡 Diferencia menor"
+                        : "🔴 Revisar"}
+                  </span>
+                </div>
+                <div style={resumenBox}>
+                  <strong>Venta efectiva PedidosYa</strong>
+                  <span>{moneda(conciliacionPiu.venta_efectiva_pedidosya)}</span>
+                </div>
+                <div style={resumenBox}>
+                  <strong>Venta identificada en Isatech</strong>
+                  <span>{moneda(conciliacionPiu.venta_isatech_pedidosya)}</span>
+                </div>
+                <div style={resumenBox}>
+                  <strong>Diferencia de ventas</strong>
+                  <span>{moneda(conciliacionPiu.diferencia_ventas)}</span>
+                </div>
+                <div style={resumenBox}>
+                  <strong>Unidades PedidosYa / Isatech</strong>
+                  <span>
+                    {conciliacionPiu.unidades_pedidosya.toLocaleString("es-UY")} /{" "}
+                    {conciliacionPiu.unidades_isatech.toLocaleString("es-UY")}
+                  </span>
+                </div>
+                <div style={resumenBox}>
+                  <strong>Diferencia de unidades</strong>
+                  <span>{conciliacionPiu.diferencia_unidades.toLocaleString("es-UY")}</span>
+                </div>
+                <div style={resumenBox}>
+                  <strong>Pedidos contabilizados</strong>
+                  <span>{conciliacionPiu.pedidos_contabilizados}</span>
+                </div>
+                <div style={resumenBox}>
+                  <strong>Cancelados excluidos</strong>
+                  <span>{conciliacionPiu.pedidos_cancelados}</span>
+                </div>
+              </div>
+
+              {conciliacionPiu.detalle.length > 0 && (
+                <div style={{ overflowX: "auto", marginTop: 20 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={celda}>Producto agrupado</th>
+                        <th style={celda}>PedidosYa</th>
+                        <th style={celda}>Isatech</th>
+                        <th style={celda}>Diferencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {conciliacionPiu.detalle.map((fila) => (
+                        <tr key={fila.producto}>
+                          <td style={celda}>{fila.producto}</td>
+                          <td style={celda}>{fila.unidades_pedidosya.toLocaleString("es-UY")}</td>
+                          <td style={celda}>{fila.unidades_isatech.toLocaleString("es-UY")}</td>
+                          <td style={celda}>{fila.diferencia.toLocaleString("es-UY")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <p style={hint}>
+                Control informativo: las diferencias pueden corresponder a
+                productos registrados con códigos generales en Isatech. No
+                modifica la facturación, los costos, los márgenes, los rankings
+                ni ningún cálculo del dashboard.
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
       {rentabilidad.length > 0 && (
         <section style={card}>
@@ -1207,6 +1343,12 @@ const resumenBox: React.CSSProperties = {
   display: "grid",
   gap: 8,
   textAlign: "center",
+};
+
+const celda: React.CSSProperties = {
+  padding: "10px 8px",
+  borderBottom: "1px solid #334155",
+  textAlign: "left",
 };
 
 const tableHeader: React.CSSProperties = {

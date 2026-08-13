@@ -133,12 +133,25 @@ export async function reemplazarOrderDetailsPedidosYa(
   const turnoFallback = input.turno || "general";
 
   /*
-   * Order Details es el detalle completo del período. Antes de reimportarlo
-   * eliminamos cualquier clasificación anterior del mismo período/sucursal
-   * (incluida "general"), para que una corrección de horarios no deje
-   * pedidos duplicados o pedidos en el turno equivocado.
+   * Reemplazamos solamente los turnos realmente presentes en el archivo
+   * que se está importando. Esto es importante porque Duna puede cargar
+   * Order Details separados por turno: si el archivo contiene sólo Noche,
+   * no debemos borrar el detalle ya cargado de Mediodía.
+   *
+   * "general" se incluye para limpiar importaciones antiguas del mismo
+   * período sin afectar el otro turno.
    */
-  const turnosAReemplazar = ["mediodia", "noche", "general"];
+  const turnosPresentes = Array.from(
+    new Set(
+      input.pedidos.map((pedido) =>
+        turnoPorFecha(pedido.fecha, turnoFallback)
+      )
+    )
+  );
+
+  const turnosAReemplazar = Array.from(
+    new Set([...turnosPresentes, "general"])
+  );
 
   /*
    * Primero buscamos y eliminamos todos los pedidos

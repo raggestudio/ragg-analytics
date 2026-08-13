@@ -23,30 +23,6 @@ function redondearImporte(valor: number) {
 }
 
 
-/*
- * Duna: los pedidos se separan por la hora real del pedido.
- * Mediodía: antes de las 18:00.
- * Noche: desde las 18:00 inclusive.
- *
- * La fecha llega normalizada por el parser como ISO. Si por algún motivo
- * no hay una fecha válida, se conserva el turno indicado en la importación
- * como fallback; si tampoco existe, se usa mediodía.
- */
-function turnoPorFecha(
-  fecha: string | null,
-  turnoFallback?: "general" | "mediodia" | "noche"
-): "mediodia" | "noche" {
-  if (fecha) {
-    const fechaPedido = new Date(fecha);
-
-    if (!Number.isNaN(fechaPedido.getTime())) {
-      return fechaPedido.getHours() >= 18 ? "noche" : "mediodia";
-    }
-  }
-
-  return turnoFallback === "noche" ? "noche" : "mediodia";
-}
-
 async function insertarEnLotes(
   tabla: string,
   filas: Record<string, unknown>[]
@@ -130,28 +106,19 @@ async function insertarPedidosEnLotes(
 export async function reemplazarOrderDetailsPedidosYa(
   input: ReemplazarOrderDetailsInput
 ) {
-  const turnoFallback = input.turno || "general";
+  const turno = input.turno || "general";
 
   /*
-   * Reemplazamos solamente los turnos realmente presentes en el archivo
-   * que se está importando. Esto es importante porque Duna puede cargar
-   * Order Details separados por turno: si el archivo contiene sólo Noche,
-   * no debemos borrar el detalle ya cargado de Mediodía.
+   * En Duna el turno lo define el tipo de importación elegido en la pantalla:
+   * "PedidosYa mediodía - orderDetails" o "PedidosYa noche - orderDetails".
+   * No se vuelve a inferir por la hora del pedido.
    *
-   * "general" se incluye para limpiar importaciones antiguas del mismo
-   * período sin afectar el otro turno.
+   * Las importaciones antiguas "general" se limpian al reimportar mediodía.
    */
-  const turnosPresentes = Array.from(
-    new Set(
-      input.pedidos.map((pedido) =>
-        turnoPorFecha(pedido.fecha, turnoFallback)
-      )
-    )
-  );
-
-  const turnosAReemplazar = Array.from(
-    new Set([...turnosPresentes, "general"])
-  );
+  const turnosAReemplazar =
+    turno === "mediodia"
+      ? ["mediodia", "general"]
+      : [turno];
 
   /*
    * Primero buscamos y eliminamos todos los pedidos
@@ -223,7 +190,7 @@ export async function reemplazarOrderDetailsPedidosYa(
     periodo_id: input.periodo_id,
     periodo_anio: input.periodo_anio ?? null,
     periodo_mes: input.periodo_mes ?? null,
-    turno: turnoPorFecha(pedido.fecha, turnoFallback),
+    turno,
 
     numero_pedido: pedido.numero_pedido,
     fecha: pedido.fecha,
@@ -318,7 +285,7 @@ export async function reemplazarOrderDetailsPedidosYa(
         sucursal_id:
           input.sucursal_id || null,
         periodo_id: input.periodo_id,
-        turno: turnoPorFecha(pedido.fecha, turnoFallback),
+        turno,
         numero_pedido:
           pedido.numero_pedido,
         nombre_producto:

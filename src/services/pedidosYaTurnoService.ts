@@ -603,8 +603,13 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
           : 0;
     }
 
+    /*
+     * Cuando existe orderDetails, la cantidad de pedidos del detalle
+     * es la fuente de verdad del turno. El resumen diario puede contener
+     * un conteo parcial o provenir de una carga anterior.
+     */
     if (
-      porTurno[turno].pedidos <= 0 &&
+      porTurno[turno].detalle_disponible &&
       porTurno[turno].pedidos_detalle > 0
     ) {
       porTurno[turno].pedidos =

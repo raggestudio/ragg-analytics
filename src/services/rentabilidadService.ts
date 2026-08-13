@@ -829,8 +829,53 @@ if (deleteError) throw deleteError;
     contadores,
   });
 
+  /*
+   * Para PedidosYa, orderDetails es la fuente de verdad del total económico.
+   * El archivo de productos define mix, cantidades y costos. Ajustamos la
+   * venta bruta de cada producto proporcionalmente para que la suma coincida
+   * exactamente con la venta bruta del orderDetails.
+   */
+  const ventasProductosPedidosYa = productosPedidosYa.reduce(
+    (total, producto) =>
+      total +
+      Number(
+        producto.total ??
+          producto.ventas ??
+          0
+      ),
+    0
+  );
+
+  const productosPedidosYaAjustados =
+    productosPedidosYa.map((producto) => {
+      const ventaOriginal = Number(
+        producto.total ??
+          producto.ventas ??
+          0
+      );
+
+      const participacion =
+        ventasProductosPedidosYa > 0
+          ? ventaOriginal /
+            ventasProductosPedidosYa
+          : 0;
+
+      const ventaAjustada =
+        costosPedidosYa.ventas_brutas > 0 &&
+        ventasProductosPedidosYa > 0
+          ? costosPedidosYa.ventas_brutas *
+            participacion
+          : ventaOriginal;
+
+      return {
+        ...producto,
+        ventas: ventaAjustada,
+        total: ventaAjustada,
+      };
+    });
+
   const filasPedidosYa = construirFilas({
-  productos: productosPedidosYa,
+  productos: productosPedidosYaAjustados,
   canal: "PedidosYa",
   empresa_id: input.empresa_id,
   periodo_id: input.periodo_id,

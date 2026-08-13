@@ -292,7 +292,17 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
     periodoHastaId || "-",
   ].join(":");
 
-  if (!forzarActualizacion) {
+  const empresaParaCache = empresas.find(
+    (empresa) => empresa.id === empresaId
+  );
+  const usarCache =
+    empresaParaCache?.tipo_negocio !== "restaurante";
+
+  /*
+   * En restaurantes (Duna) los archivos de PedidosYa pueden reemplazarse
+   * durante la misma sesión. No reutilizamos un resumen viejo por 30 minutos.
+   */
+  if (!forzarActualizacion && usarCache) {
     try {
       const cacheTexto =
         sessionStorage.getItem(claveCache);
@@ -435,6 +445,7 @@ setResumenTurnos(resumenTurnosData);
 
 setInsights(insightsCalculados);
 
+if (usarCache) {
 sessionStorage.setItem(
   claveCache,
   JSON.stringify({
@@ -458,6 +469,7 @@ sessionStorage.setItem(
     insights: insightsCalculados,
   })
 );
+}
     } catch (error: any) {
       console.error(error);
       setMensaje(error?.message || "Error cargando dashboard");

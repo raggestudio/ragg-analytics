@@ -109,8 +109,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       soloLectura: perfil?.rol !== "admin",
       tienePermiso(seccion) {
         if (perfil?.rol === "admin") return true;
-        if (!perfil?.permisos) return true;
-        return perfil.permisos.includes(seccion);
+        if (perfil?.rol !== "cliente") return false;
+
+        // Si un cliente todavía no tiene permisos explícitos cargados,
+        // usamos el perfil de consulta seguro acordado para clientes:
+        // Dashboard, Productos, Costos y Gastos.
+        const permisosClientePorDefecto = [
+          "dashboard",
+          "productos",
+          "costos",
+          "gastos",
+        ];
+
+        const permisos =
+          Array.isArray(perfil.permisos) && perfil.permisos.length > 0
+            ? perfil.permisos
+            : permisosClientePorDefecto;
+
+        return permisos.includes(seccion);
       },
       async iniciarSesion(email, password) {
         const { error } = await supabase.auth.signInWithPassword({

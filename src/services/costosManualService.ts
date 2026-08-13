@@ -126,20 +126,50 @@ export async function obtenerCostosManualesPorEmpresa(
 export async function actualizarCostoManual(input: {
   id: string;
   empresa_id: string;
-  costo: number;
+  costo?: number;
+  precio_referencia?: number | null;
 }): Promise<CostoProductoManual> {
-  const costo = Number(input.costo);
+  const cambios: {
+    costo?: number;
+    precio_referencia?: number | null;
+    updated_at: string;
+  } = {
+    updated_at: new Date().toISOString(),
+  };
 
-  if (!Number.isFinite(costo) || costo < 0) {
-    throw new Error("El costo debe ser un número mayor o igual a cero.");
+  if (input.costo !== undefined) {
+    const costo = Number(input.costo);
+
+    if (!Number.isFinite(costo) || costo < 0) {
+      throw new Error("El costo debe ser un número mayor o igual a cero.");
+    }
+
+    cambios.costo = costo;
+  }
+
+  if (input.precio_referencia !== undefined) {
+    if (input.precio_referencia === null) {
+      cambios.precio_referencia = null;
+    } else {
+      const precioReferencia = Number(input.precio_referencia);
+
+      if (!Number.isFinite(precioReferencia) || precioReferencia < 0) {
+        throw new Error(
+          "El precio de referencia debe ser un número mayor o igual a cero."
+        );
+      }
+
+      cambios.precio_referencia = precioReferencia;
+    }
+  }
+
+  if (input.costo === undefined && input.precio_referencia === undefined) {
+    throw new Error("No hay cambios para guardar.");
   }
 
   const { data, error } = await supabase
     .from("producto_costo_manual")
-    .update({
-      costo,
-      updated_at: new Date().toISOString(),
-    })
+    .update(cambios)
     .eq("id", input.id)
     .eq("empresa_id", input.empresa_id)
     .select("*")

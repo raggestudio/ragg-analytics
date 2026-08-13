@@ -68,6 +68,68 @@ function nombreProductoBase(texto: unknown) {
     .trim();
 }
 
+function separarNombresFueraDeCorchetes(texto: string) {
+  const partes: string[] = [];
+  let actual = "";
+  let nivelCorchetes = 0;
+
+  for (let indice = 0; indice < texto.length; indice++) {
+    const caracter = texto[indice];
+
+    if (caracter === "[") nivelCorchetes++;
+    if (caracter === "]" && nivelCorchetes > 0) {
+      nivelCorchetes--;
+    }
+
+    if (
+      caracter === "," &&
+      nivelCorchetes === 0 &&
+      /^\s*\d+\s+/.test(texto.slice(indice + 1))
+    ) {
+      if (actual.trim()) partes.push(actual.trim());
+      actual = "";
+      continue;
+    }
+
+    actual += caracter;
+  }
+
+  if (actual.trim()) partes.push(actual.trim());
+
+  return partes;
+}
+
+function separarProductosCombinados(
+  texto: unknown,
+  cantidadOriginal: number
+) {
+  return separarNombresFueraDeCorchetes(
+    String(texto || "Sin nombre")
+  )
+    .map((parte, index) => {
+      const limpia = parte.trim();
+      const matchCantidad = limpia.match(
+        /^(\d+(?:[.,]\d+)?)\s*(?:[xX×]\s*)?(.+)$/
+      );
+
+      if (matchCantidad) {
+        return {
+          nombre: nombreProductoBase(matchCantidad[2]),
+          cantidad:
+            cantidadOriginal *
+            (Number(matchCantidad[1].replace(",", ".")) || 1),
+        };
+      }
+
+      return {
+        nombre: nombreProductoBase(limpia),
+        cantidad:
+          index === 0 ? cantidadOriginal : cantidadOriginal,
+      };
+    })
+    .filter((producto) => producto.nombre);
+}
+
 function pedidoContabilizable(estado: unknown) {
   const valor = normalizar(estado);
   if (!valor) return true;
@@ -249,9 +311,16 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     .eq("empresa_id", input.empresa_id)
     .eq("origen", "PedidosYa");
 
+  /*
+   * No filtramos pedidosya_pedidos únicamente por periodo_id.
+   * En Duna existen importaciones históricas donde un mismo mes quedó
+   * asociado a más de un periodo_id. Recuperamos también año/mes y luego
+   * filtramos en memoria por ID o por año-mes.
+   */
   let pedidosQuery = supabase
     .from("pedidosya_pedidos")
     .select(`
+      numero_pedido,
       turno,
       estado_pedido,
       total_parcial,
@@ -260,8 +329,16 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       iva_comision,
       tarifa_pago_linea,
       retencion_recuperable,
-      ingreso_estimado
+      ingreso_estimado,
+      periodo_id,
+      periodo_anio,
+      periodo_mes
     `)
+    .eq("empresa_id", input.empresa_id);
+
+  let productosQuery = supabase
+    .from("pedidosya_pedido_productos")
+    .select("turno, nombre_producto, cantidad")
     .eq("empresa_id", input.empresa_id)
     .in("periodo_id", input.periodo_ids);
 
@@ -287,6 +364,10 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       "sucursal_id",
       input.sucursal_id
     );
+    productosQuery = productosQuery.eq(
+      "sucursal_id",
+      input.sucursal_id
+    );
     resumenProductosQuery = resumenProductosQuery.eq(
       "sucursal_id",
       input.sucursal_id
@@ -296,6 +377,7 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   const [
     { data: ventas, error: ventasError },
     { data: pedidos, error: pedidosError },
+    { data: productos, error: productosError },
     {
       data: resumenProductos,
       error: resumenProductosError,
@@ -305,6 +387,7 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   ] = await Promise.all([
     ventasQuery,
     pedidosQuery,
+    productosQuery,
     resumenProductosQuery,
     supabase
       .from("producto_costo_manual")
@@ -325,6 +408,7 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
 
   if (ventasError) throw ventasError;
   if (pedidosError) throw pedidosError;
+  if (productosError) throw productosError;
   if (resumenProductosError) throw resumenProductosError;
   if (costosError) throw costosError;
   if (vinculacionesError) throw vinculacionesError;
@@ -355,7 +439,68 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     );
   }
 
-  for (const pedido of pedidos || []) {
+  /*
+   * Tomamos pedidos del período seleccionado por ID o por año/mes.
+   * Esto recupera correctamente una reimportación aunque haya quedado
+   * vinculada a otro periodo_id duplicado del mismo mes.
+   *
+   * Además:
+   * - ignoramos filas antiguas "general" cuando ya existen turnos explícitos;
+   * - deduplicamos por turno + número de pedido, de modo que una reimportación
+   *   del mismo pedido no se sume dos veces.
+   */
+  const pedidosDelPeriodo = (pedidos || []).filter((pedido: any) => {
+    const porId = input.periodo_ids.includes(
+      String(pedido.periodo_id || "")
+    );
+
+    const porAnioMes = periodosSeleccionados.has(
+      `${Number(pedido.periodo_anio)}-${Number(
+        pedido.periodo_mes
+      )}`
+    );
+
+    return porId || porAnioMes;
+  });
+
+  const hayTurnosExplicitos = pedidosDelPeriodo.some(
+    (pedido: any) =>
+      pedido.turno === "mediodia" ||
+      pedido.turno === "noche"
+  );
+
+  const pedidosUnicos = new Map<string, any>();
+
+  for (const pedido of pedidosDelPeriodo) {
+    if (
+      hayTurnosExplicitos &&
+      pedido.turno !== "mediodia" &&
+      pedido.turno !== "noche"
+    ) {
+      continue;
+    }
+
+    const turno =
+      pedido.turno === "noche" ? "noche" : "mediodia";
+
+    const numero = String(
+      pedido.numero_pedido || ""
+    ).trim();
+
+    const clave = `${turno}:${numero || JSON.stringify([
+      pedido.total_parcial,
+      pedido.descuento_local,
+      pedido.comision,
+      pedido.ingreso_estimado,
+    ])}`;
+
+    pedidosUnicos.set(clave, {
+      ...pedido,
+      turno,
+    });
+  }
+
+  for (const pedido of pedidosUnicos.values()) {
     if (!pedidoContabilizable(pedido.estado_pedido)) continue;
 
     const turno =
@@ -428,6 +573,35 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     noche: new Set<string>(),
   };
 
+  for (const producto of productos || []) {
+    const turno =
+      producto.turno === "noche" ? "noche" : "mediodia";
+
+    const productosSeparados = separarProductosCombinados(
+      producto.nombre_producto,
+      Number(producto.cantidad || 0)
+    );
+
+    for (const productoSeparado of productosSeparados) {
+      const nombre = productoSeparado.nombre;
+      const clave = normalizar(nombre);
+      const costoUnitario =
+        costoVinculado.get(clave) ??
+        costoPorNombre.get(clave);
+
+      if (
+        costoUnitario === undefined ||
+        costoUnitario <= 0
+      ) {
+        sinCostoPorTurno[turno].add(nombre);
+        continue;
+      }
+
+      porTurno[turno].costo_productos +=
+        costoUnitario * productoSeparado.cantidad;
+    }
+  }
+
   for (const producto of resumenProductos || []) {
     const perteneceAlPeriodo =
       input.periodo_ids.includes(
@@ -458,26 +632,6 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       ventas:
         Number(existente?.ventas || 0) + ventasProducto,
     });
-
-    /*
-     * La misma fuente de productos alimenta costos, unidades y rankings.
-     * Así Dashboard y rentabilidad usan exactamente el mismo universo.
-     */
-    porTurno[turno].unidades += cantidad;
-
-    const costoUnitario =
-      costoVinculado.get(clave) ??
-      costoPorNombre.get(clave);
-
-    if (
-      costoUnitario === undefined ||
-      costoUnitario <= 0
-    ) {
-      sinCostoPorTurno[turno].add(nombre);
-    } else {
-      porTurno[turno].costo_productos +=
-        costoUnitario * cantidad;
-    }
   }
 
   for (const resumen of Object.values(porTurno)) {
@@ -585,21 +739,10 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
           participacion;
         const costoCanalAsignado =
           costoCanal * participacion;
-
-        /*
-         * Si existe orderDetails, su venta efectiva es la fuente de verdad.
-         * Se distribuye proporcionalmente entre los productos del resumen
-         * para que el detalle por producto cierre exactamente con el turno.
-         */
-        const ventaEfectiva =
-          porTurno[turno].detalle_disponible &&
-          porTurno[turno].venta_efectiva > 0
-            ? porTurno[turno].venta_efectiva *
-              participacion
-            : Math.max(
-                producto.ventas - descuentoLocal,
-                0
-              );
+        const ventaEfectiva = Math.max(
+          producto.ventas - descuentoLocal,
+          0
+        );
 
         return {
           nombre: producto.nombre,

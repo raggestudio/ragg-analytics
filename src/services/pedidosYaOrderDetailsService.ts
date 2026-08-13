@@ -22,6 +22,31 @@ function redondearImporte(valor: number) {
   ) / 100;
 }
 
+
+/*
+ * Duna: los pedidos se separan por la hora real del pedido.
+ * Mediodía: antes de las 18:00.
+ * Noche: desde las 18:00 inclusive.
+ *
+ * La fecha llega normalizada por el parser como ISO. Si por algún motivo
+ * no hay una fecha válida, se conserva el turno indicado en la importación
+ * como fallback; si tampoco existe, se usa mediodía.
+ */
+function turnoPorFecha(
+  fecha: string | null,
+  turnoFallback?: "general" | "mediodia" | "noche"
+): "mediodia" | "noche" {
+  if (fecha) {
+    const fechaPedido = new Date(fecha);
+
+    if (!Number.isNaN(fechaPedido.getTime())) {
+      return fechaPedido.getHours() >= 18 ? "noche" : "mediodia";
+    }
+  }
+
+  return turnoFallback === "noche" ? "noche" : "mediodia";
+}
+
 async function insertarEnLotes(
   tabla: string,
   filas: Record<string, unknown>[]
@@ -105,16 +130,15 @@ async function insertarPedidosEnLotes(
 export async function reemplazarOrderDetailsPedidosYa(
   input: ReemplazarOrderDetailsInput
 ) {
-  const turno = input.turno || "general";
+  const turnoFallback = input.turno || "general";
+
   /*
-   * Las primeras importaciones de Duna se guardaron como "general".
-   * Al volver a importar el mediodía también reemplazamos esos datos
-   * antiguos, para que no queden duplicados ni se sumen dos veces.
+   * Order Details es el detalle completo del período. Antes de reimportarlo
+   * eliminamos cualquier clasificación anterior del mismo período/sucursal
+   * (incluida "general"), para que una corrección de horarios no deje
+   * pedidos duplicados o pedidos en el turno equivocado.
    */
-  const turnosAReemplazar =
-    turno === "mediodia"
-      ? ["mediodia", "general"]
-      : [turno];
+  const turnosAReemplazar = ["mediodia", "noche", "general"];
 
   /*
    * Primero buscamos y eliminamos todos los pedidos
@@ -186,7 +210,7 @@ export async function reemplazarOrderDetailsPedidosYa(
     periodo_id: input.periodo_id,
     periodo_anio: input.periodo_anio ?? null,
     periodo_mes: input.periodo_mes ?? null,
-    turno,
+    turno: turnoPorFecha(pedido.fecha, turnoFallback),
 
     numero_pedido: pedido.numero_pedido,
     fecha: pedido.fecha,
@@ -281,7 +305,7 @@ export async function reemplazarOrderDetailsPedidosYa(
         sucursal_id:
           input.sucursal_id || null,
         periodo_id: input.periodo_id,
-        turno,
+        turno: turnoPorFecha(pedido.fecha, turnoFallback),
         numero_pedido:
           pedido.numero_pedido,
         nombre_producto:

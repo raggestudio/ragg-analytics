@@ -312,15 +312,14 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     .eq("origen", "PedidosYa");
 
   /*
-   * No filtramos pedidosya_pedidos únicamente por periodo_id.
-   * En Duna existen importaciones históricas donde un mismo mes quedó
-   * asociado a más de un periodo_id. Recuperamos también año/mes y luego
-   * filtramos en memoria por ID o por año-mes.
+   * pedidosya_pedidos se consulta con la misma combinación verificada
+   * directamente en Supabase: empresa + periodo_id + sucursal.
+   * El campo turno ya está correctamente guardado en cada pedido,
+   * por lo que no se reinterpreta ni se deduplica.
    */
   let pedidosQuery = supabase
     .from("pedidosya_pedidos")
     .select(`
-      numero_pedido,
       turno,
       estado_pedido,
       total_parcial,
@@ -329,12 +328,10 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       iva_comision,
       tarifa_pago_linea,
       retencion_recuperable,
-      ingreso_estimado,
-      periodo_id,
-      periodo_anio,
-      periodo_mes
+      ingreso_estimado
     `)
-    .eq("empresa_id", input.empresa_id);
+    .eq("empresa_id", input.empresa_id)
+    .in("periodo_id", input.periodo_ids);
 
   let productosQuery = supabase
     .from("pedidosya_pedido_productos")
@@ -439,69 +436,15 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     );
   }
 
-  /*
-   * Tomamos pedidos del período seleccionado por ID o por año/mes.
-   * Esto recupera correctamente una reimportación aunque haya quedado
-   * vinculada a otro periodo_id duplicado del mismo mes.
-   *
-   * Además:
-   * - ignoramos filas antiguas "general" cuando ya existen turnos explícitos;
-   * - deduplicamos por turno + número de pedido, de modo que una reimportación
-   *   del mismo pedido no se sume dos veces.
-   */
-  const pedidosDelPeriodo = (pedidos || []).filter((pedido: any) => {
-    const porId = input.periodo_ids.includes(
-      String(pedido.periodo_id || "")
-    );
+  for (const pedido of pedidos || []) {
+    if (!pedidoContabilizable(pedido.estado_pedido)) continue;
 
-    const porAnioMes = periodosSeleccionados.has(
-      `${Number(pedido.periodo_anio)}-${Number(
-        pedido.periodo_mes
-      )}`
-    );
-
-    return porId || porAnioMes;
-  });
-
-  const hayTurnosExplicitos = pedidosDelPeriodo.some(
-    (pedido: any) =>
-      pedido.turno === "mediodia" ||
-      pedido.turno === "noche"
-  );
-
-  const pedidosUnicos = new Map<string, any>();
-
-  for (const pedido of pedidosDelPeriodo) {
     if (
-      hayTurnosExplicitos &&
       pedido.turno !== "mediodia" &&
       pedido.turno !== "noche"
     ) {
       continue;
     }
-
-    const turno =
-      pedido.turno === "noche" ? "noche" : "mediodia";
-
-    const numero = String(
-      pedido.numero_pedido || ""
-    ).trim();
-
-    const clave = `${turno}:${numero || JSON.stringify([
-      pedido.total_parcial,
-      pedido.descuento_local,
-      pedido.comision,
-      pedido.ingreso_estimado,
-    ])}`;
-
-    pedidosUnicos.set(clave, {
-      ...pedido,
-      turno,
-    });
-  }
-
-  for (const pedido of pedidosUnicos.values()) {
-    if (!pedidoContabilizable(pedido.estado_pedido)) continue;
 
     const turno =
       pedido.turno === "noche" ? "noche" : "mediodia";

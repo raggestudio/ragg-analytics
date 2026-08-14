@@ -7,7 +7,6 @@ import {
 import {
   guardarVinculacionProducto,
   obtenerVinculacionesProducto,
-  type ProductoVinculacion,
 } from "../../services/productoVinculacionService";
 import { calcularRentabilidadPeriodo } from "../../services/rentabilidadService";
 
@@ -48,75 +47,6 @@ function normalizar(texto: string) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function nombreProductoBase(texto: unknown) {
-  return String(texto || "Sin nombre")
-    .replace(/^\s*\d+(?:[.,]\d+)?\s*[xX×]?\s+/, "")
-    .replace(/\s*\[[^\]]*\]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function separarNombresFueraDeCorchetes(texto: string) {
-  const partes: string[] = [];
-  let actual = "";
-  let nivelCorchetes = 0;
-
-  for (let indice = 0; indice < texto.length; indice++) {
-    const caracter = texto[indice];
-
-    if (caracter === "[") nivelCorchetes++;
-    if (caracter === "]" && nivelCorchetes > 0) {
-      nivelCorchetes--;
-    }
-
-    if (
-      caracter === "," &&
-      nivelCorchetes === 0 &&
-      /^\s*\d+\s+/.test(texto.slice(indice + 1))
-    ) {
-      if (actual.trim()) partes.push(actual.trim());
-      actual = "";
-      continue;
-    }
-
-    actual += caracter;
-  }
-
-  if (actual.trim()) partes.push(actual.trim());
-
-  return partes;
-}
-
-function separarProductosCombinados(
-  texto: unknown,
-  cantidadOriginal: number
-) {
-  return separarNombresFueraDeCorchetes(
-    String(texto || "Sin nombre")
-  )
-    .map((parte) => {
-      const limpia = parte.trim();
-      const matchCantidad = limpia.match(
-        /^(\d+(?:[.,]\d+)?)\s*(?:[xX×]\s*)?(.+)$/
-      );
-
-      if (matchCantidad) {
-        return {
-          nombre: nombreProductoBase(matchCantidad[2]),
-          cantidad:
-            cantidadOriginal *
-            (Number(matchCantidad[1].replace(",", ".")) || 1),
-        };
-      }
-
-      return {
-        nombre: nombreProductoBase(limpia),
-        cantidad: cantidadOriginal,
-      };
-    })
-    .filter((producto) => producto.nombre);
 }
 
 function palabras(texto: string) {
@@ -194,10 +124,6 @@ export default function VinculacionesRestaurante({
 }: Props) {
   const [productos, setProductos] = useState<ProductoPendiente[]>([]);
   const [costos, setCostos] = useState<CostoProductoManual[]>([]);
-  const [, setVinculaciones] = useState<
-  ProductoVinculacion[]
->([]);
-
   const [selecciones, setSelecciones] = useState<Record<string, string>>({});
   const [busquedasCosto, setBusquedasCosto] = useState<
     Record<string, string>
@@ -223,7 +149,6 @@ export default function VinculacionesRestaurante({
         rentabilidadResponse,
         ventasParadiseResponse,
         ventasPedidosYaResponse,
-        productosOrderDetailsResponse,
       ] = await Promise.all([
         obtenerCostosManualesPorEmpresa(empresaId),
 
@@ -274,18 +199,6 @@ export default function VinculacionesRestaurante({
             `
           )
           .eq("empresa_id", empresaId),
-
-        supabase
-          .from("pedidosya_pedido_productos")
-          .select(
-            `
-              periodo_id,
-              sucursal_id,
-              nombre_producto,
-              cantidad
-            `
-          )
-          .eq("empresa_id", empresaId),
       ]);
 
       if (rentabilidadResponse.error) {
@@ -298,10 +211,6 @@ export default function VinculacionesRestaurante({
 
       if (ventasPedidosYaResponse.error) {
         throw ventasPedidosYaResponse.error;
-      }
-
-      if (productosOrderDetailsResponse.error) {
-        throw productosOrderDetailsResponse.error;
       }
 
       const mapaCodigo = new Map<string, string | null>();
@@ -344,7 +253,13 @@ export default function VinculacionesRestaurante({
           normalizar(fila.nombre_producto),
         ].join("__");
 
-        const codigo = mapaCodigo.get(claveVenta) || null;
+        // Los comprobantes manuales (Salón / Re Order) no tienen código
+        // Paradise. Usamos una clave estable por nombre para que puedan
+        // vincularse con un costo y conservar esa selección en futuros
+        // recálculos.
+        const codigo =
+          mapaCodigo.get(claveVenta) ||
+          `nombre:${normalizar(fila.nombre_producto)}`;
 
         const claveProducto = `${sistema}__${
           codigo || normalizar(fila.nombre_producto)
@@ -384,92 +299,12 @@ export default function VinculacionesRestaurante({
         }
       }
 
-      /*
-       * El dashboard calcula los costos por turno directamente desde
-       * pedidosya_pedido_productos. Por eso esta pantalla también debe
-       * revisar esa misma fuente: un producto recién importado puede no
-       * haber llegado todavía a rentabilidad_periodo y, de otro modo,
-       * figuraría "sin costo" en el dashboard pero no aparecería aquí.
-       */
-      const costosDirectos = new Set(
-        costosData.map((costo) =>
-          normalizar(costo.nombre_producto)
-        )
-      );
-
-      const nombresVinculados = new Set<string>();
-
-      for (const vinculacion of vinculacionesData) {
-        if (!vinculacion.costo_manual_id) continue;
-
-        const nombre = normalizar(
-          nombreProductoBase(vinculacion.nombre_sistema)
-        );
-
-        if (nombre) nombresVinculados.add(nombre);
-      }
-
-      for (const fila of productosOrderDetailsResponse.data || []) {
-        const productosSeparados = separarProductosCombinados(
-          fila.nombre_producto,
-          Number(fila.cantidad || 0)
-        );
-
-        for (const productoSeparado of productosSeparados) {
-          const nombre = productoSeparado.nombre;
-          const nombreNormalizado = normalizar(nombre);
-
-          if (!nombreNormalizado) continue;
-          if (costosDirectos.has(nombreNormalizado)) continue;
-          if (nombresVinculados.has(nombreNormalizado)) continue;
-
-          const codigo = `nombre:${nombreNormalizado}`;
-          const claveProducto = `pedidosya__${codigo}`;
-          const existente = agrupados.get(claveProducto);
-          const contexto: ContextoPeriodo = {
-            periodo_id: fila.periodo_id,
-            sucursal_id: fila.sucursal_id || null,
-          };
-
-          if (existente) {
-            existente.cantidad += productoSeparado.cantidad;
-
-            const contextoExiste = existente.contextos.some(
-              (item) =>
-                item.periodo_id === contexto.periodo_id &&
-                item.sucursal_id === contexto.sucursal_id
-            );
-
-            if (!contextoExiste) {
-              existente.contextos.push(contexto);
-            }
-          } else {
-            agrupados.set(claveProducto, {
-              clave: claveProducto,
-              sistema: "pedidosya",
-              codigo_producto: codigo,
-              nombre_producto: nombre,
-              categoria: null,
-              cantidad: productoSeparado.cantidad,
-              /*
-               * orderDetails no informa la venta por producto.
-               * Se deja en cero; el objetivo de esta fila es permitir
-               * completar el costo que falta en el cálculo por turno.
-               */
-              ventas: 0,
-              contextos: [contexto],
-            });
-          }
-        }
-      }
-
       const productosData = Array.from(agrupados.values()).sort(
         (a, b) => b.ventas - a.ventas
       );
 
       setProductos(productosData);
       setCostos(costosData);
-      setVinculaciones(vinculacionesData);
 
       const seleccionesIniciales: Record<string, string> = {};
 
@@ -780,10 +615,8 @@ export default function VinculacionesRestaurante({
             </strong>
 
             <p>
-              Los productos de esta lista fueron vendidos, pero
-              todavía no tienen un costo vinculado. Cuando el
-              producto proviene solamente de orderDetails, el
-              archivo no informa su precio individual.
+              Los productos de esta lista tienen ventas, pero
+              todavía no tienen un costo vinculado.
             </p>
 
             {sugerenciasConfiables.length > 0 && (
@@ -817,7 +650,7 @@ export default function VinculacionesRestaurante({
       </section>
 
       <section style={card}>
-        <h3>Vincular productos Paradise y PedidosYa con costos</h3>
+        <h3>Vincular productos Paradise, PedidosYa, Salón y Re Order con costos</h3>
 
         {cargando ? (
           <p>Cargando...</p>
@@ -851,49 +684,38 @@ export default function VinculacionesRestaurante({
     <div style={datosSecundarios}>
       {producto.sistema === "pedidosya"
         ? "PedidosYa"
+        : producto.codigo_producto?.startsWith("nombre:")
+        ? "Vinculación por nombre"
         : "Código Paradise"}:{" "}
-      {producto.sistema === "pedidosya"
+      {producto.sistema === "pedidosya" ||
+      producto.codigo_producto?.startsWith("nombre:")
         ? "Vinculación por nombre"
         : producto.codigo_producto || "Sin código"}
     </div>
   </div>
 
   <div style={ventasBox}>
-    {producto.ventas > 0 ? (
-      <>
-        <span>Precio promedio por unidad</span>
+    <span>Precio promedio por unidad</span>
 
-        <strong style={precioUnitario}>
-          $
-          {(
-            producto.cantidad > 0
-              ? producto.ventas / producto.cantidad
-              : 0
-          ).toLocaleString("es-UY", {
-            maximumFractionDigits: 2,
-          })}
-        </strong>
+    <strong style={precioUnitario}>
+      $
+      {(
+        producto.cantidad > 0
+          ? producto.ventas / producto.cantidad
+          : 0
+      ).toLocaleString("es-UY", {
+        maximumFractionDigits: 2,
+      })}
+    </strong>
 
-        <span>
-          {producto.cantidad.toLocaleString("es-UY")} unidades
-        </span>
+    <span>
+      {producto.cantidad.toLocaleString("es-UY")} unidades
+    </span>
 
-        <small>
-          Venta total: $
-          {producto.ventas.toLocaleString("es-UY")}
-        </small>
-      </>
-    ) : (
-      <>
-        <span>Detectado en orderDetails</span>
-        <strong style={precioUnitario}>
-          {producto.cantidad.toLocaleString("es-UY")} unidades
-        </strong>
-        <small>
-          Precio individual no informado por el archivo
-        </small>
-      </>
-    )}
+    <small>
+      Venta total: $
+      {producto.ventas.toLocaleString("es-UY")}
+    </small>
   </div>
 </div>
 
@@ -1007,21 +829,19 @@ export default function VinculacionesRestaurante({
       </strong>
 
       <div style={comparacionGrid}>
-        {producto.ventas > 0 && (
-          <span>
-            Precio por unidad:
-            <strong>
-              $
-              {(
-                producto.cantidad > 0
-                  ? producto.ventas / producto.cantidad
-                  : 0
-              ).toLocaleString("es-UY", {
-                maximumFractionDigits: 2,
-              })}
-            </strong>
-          </span>
-        )}
+        <span>
+          Precio por unidad:
+          <strong>
+            $
+            {(
+              producto.cantidad > 0
+                ? producto.ventas / producto.cantidad
+                : 0
+            ).toLocaleString("es-UY", {
+              maximumFractionDigits: 2,
+            })}
+          </strong>
+        </span>
 
         <span>
           Costo por unidad:
@@ -1033,42 +853,37 @@ export default function VinculacionesRestaurante({
           </strong>
         </span>
 
-        {producto.ventas > 0 && (
-          <>
-            <span>
-              Margen por unidad:
-              <strong>
-                $
-                {Math.max(
-                  producto.cantidad > 0
-                    ? producto.ventas / producto.cantidad -
-                        Number(costoSeleccionado.costo)
-                    : 0,
-                  0
-                ).toLocaleString("es-UY", {
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
-            </span>
+        <span>
+          Margen por unidad:
+          <strong>
+            $
+            {Math.max(
+              producto.cantidad > 0
+                ? producto.ventas / producto.cantidad -
+                    Number(costoSeleccionado.costo)
+                : 0,
+              0
+            ).toLocaleString("es-UY", {
+              maximumFractionDigits: 2,
+            })}
+          </strong>
+        </span>
 
-            <span>
-              Margen estimado:
-              <strong>
-                {producto.cantidad > 0
-                  ? (
-                      ((producto.ventas /
-                        producto.cantidad -
-                        Number(costoSeleccionado.costo)) /
-                        (producto.ventas /
-                          producto.cantidad)) *
-                      100
-                    ).toFixed(1)
-                  : "0.0"}
-                %
-              </strong>
-            </span>
-          </>
-        )}
+        <span>
+          Margen estimado:
+          <strong>
+            {producto.cantidad > 0 &&
+            producto.ventas / producto.cantidad > 0
+              ? (
+                  ((producto.ventas / producto.cantidad -
+                    Number(costoSeleccionado.costo)) /
+                    (producto.ventas / producto.cantidad)) *
+                  100
+                ).toFixed(1)
+              : "0.0"}
+            %
+          </strong>
+        </span>
       </div>
     </div>
   ) : (

@@ -292,17 +292,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
     periodoHastaId || "-",
   ].join(":");
 
-  const empresaParaCache = empresas.find(
-    (empresa) => empresa.id === empresaId
-  );
-  const usarCache =
-    empresaParaCache?.tipo_negocio !== "restaurante";
-
-  /*
-   * En restaurantes (Duna) los archivos de PedidosYa pueden reemplazarse
-   * durante la misma sesión. No reutilizamos un resumen viejo por 30 minutos.
-   */
-  if (!forzarActualizacion && usarCache) {
+  if (!forzarActualizacion) {
     try {
       const cacheTexto =
         sessionStorage.getItem(claveCache);
@@ -445,7 +435,6 @@ setResumenTurnos(resumenTurnosData);
 
 setInsights(insightsCalculados);
 
-if (usarCache) {
 sessionStorage.setItem(
   claveCache,
   JSON.stringify({
@@ -469,7 +458,6 @@ sessionStorage.setItem(
     insights: insightsCalculados,
   })
 );
-}
     } catch (error: any) {
       console.error(error);
       setMensaje(error?.message || "Error cargando dashboard");
@@ -1496,25 +1484,63 @@ function textoComparacion() {
             <div style={metricGrid}>
               <Metric
                 title={resumen.es_restaurante ? "Facturación total" : "Total Isatech"}
-                value={moneda(
-                  resumen.es_restaurante
-                    ? resumen.ventas_totales
-                    : resumen.ventas_totales
-                )}
+                value={moneda(resumen.ventas_totales)}
               />
-              <Metric title="PedidoYa" value={moneda(resumen.ventas_pedidosya)} />
-              <Metric
-                title={resumen.es_restaurante ? "Paradise" : "Ventas directas"}
-                value={moneda(resumen.ventas_directas)}
-              />
-              <Metric
-                title="% PedidoYa"
-                value={porcentaje(resumen.participacion_pedidosya)}
-              />
-              <Metric
-                title={resumen.es_restaurante ? "% Paradise" : "% Ventas directas"}
-                value={porcentaje(resumen.participacion_directas)}
-              />
+
+              {resumen.es_restaurante ? (
+                <>
+                  <Metric title="PedidosYa" value={moneda(resumen.ventas_pedidosya)} />
+                  <Metric title="Paradise" value={moneda(resumen.ventas_paradise)} />
+                  <Metric title="Salón" value={moneda(resumen.ventas_salon || 0)} />
+                  <Metric title="Re Order" value={moneda(resumen.ventas_reorder || 0)} />
+
+                  <Metric
+                    title="% PedidosYa"
+                    value={porcentaje(
+                      resumen.ventas_totales > 0
+                        ? (resumen.ventas_pedidosya / resumen.ventas_totales) * 100
+                        : 0
+                    )}
+                  />
+                  <Metric
+                    title="% Paradise"
+                    value={porcentaje(
+                      resumen.ventas_totales > 0
+                        ? (resumen.ventas_paradise / resumen.ventas_totales) * 100
+                        : 0
+                    )}
+                  />
+                  <Metric
+                    title="% Salón"
+                    value={porcentaje(
+                      resumen.ventas_totales > 0
+                        ? ((resumen.ventas_salon || 0) / resumen.ventas_totales) * 100
+                        : 0
+                    )}
+                  />
+                  <Metric
+                    title="% Re Order"
+                    value={porcentaje(
+                      resumen.ventas_totales > 0
+                        ? ((resumen.ventas_reorder || 0) / resumen.ventas_totales) * 100
+                        : 0
+                    )}
+                  />
+                </>
+              ) : (
+                <>
+                  <Metric title="PedidoYa" value={moneda(resumen.ventas_pedidosya)} />
+                  <Metric title="Ventas directas" value={moneda(resumen.ventas_directas)} />
+                  <Metric
+                    title="% PedidoYa"
+                    value={porcentaje(resumen.participacion_pedidosya)}
+                  />
+                  <Metric
+                    title="% Ventas directas"
+                    value={porcentaje(resumen.participacion_directas)}
+                  />
+                </>
+              )}
             </div>
           </section>
 

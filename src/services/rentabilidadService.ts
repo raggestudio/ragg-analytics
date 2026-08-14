@@ -1245,8 +1245,9 @@ if (deleteError) throw deleteError;
     periodo_id: input.periodo_id,
     sucursal_id: input.sucursal_id || null,
     contexto,
-    vinculaciones:
-      new Map<string, string>(),
+    // Salón usa los mismos productos/costos de Duna que Paradise.
+    // Para comprobantes sin código, la clave guardada es nombre:<normalizado>.
+    vinculaciones: contexto.vinculacionesParadise,
     contadores,
   });
 
@@ -1257,8 +1258,8 @@ if (deleteError) throw deleteError;
     periodo_id: input.periodo_id,
     sucursal_id: input.sucursal_id || null,
     contexto,
-    vinculaciones:
-      new Map<string, string>(),
+    // Re Order también comparte el catálogo de costos de Duna.
+    vinculaciones: contexto.vinculacionesParadise,
     contadores,
   });
 

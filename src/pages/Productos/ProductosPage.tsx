@@ -1,4 +1,4 @@
-import { obtenerPeriodosConDatosPorEmpresa } from "../../services/periodoService";
+import { obtenerPeriodosPorEmpresa } from "../../services/periodoService";
 import type { Periodo } from "../../types/periodo";
 import { useEffect, useState } from "react";
 import { obtenerEmpresas } from "../../services/empresaService";
@@ -28,12 +28,7 @@ function obtenerPeriodoPredeterminado(periodos: Periodo[]) {
 
 export function ProductosPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [empresaId, setEmpresaId] = useState(
-    () =>
-      localStorage.getItem(
-        "productos-empresa-seleccionada"
-      ) || ""
-  );
+  const [empresaId, setEmpresaId] = useState("");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [ranking, setRanking] =
   useState<ProductoConCanal[]>([]);
@@ -49,67 +44,19 @@ export function ProductosPage() {
     cargar();
   }, []);
 
-  useEffect(() => {
-    if (!empresaId) return;
-
-    localStorage.setItem(
-      "productos-empresa-seleccionada",
-      empresaId
-    );
-  }, [empresaId]);
-
-  useEffect(() => {
-    if (!empresaId || !periodoId) return;
-
-    localStorage.setItem(
-      `productos-periodo-${empresaId}`,
-      periodoId
-    );
-  }, [empresaId, periodoId]);
-
-  useEffect(() => {
-    if (!empresaId || !canal) return;
-
-    localStorage.setItem(
-      `productos-canal-${empresaId}`,
-      canal
-    );
-  }, [empresaId, canal]);
-
   async function cargar() {
   const empresasData = await obtenerEmpresas();
   setEmpresas(empresasData);
 
   if (empresasData.length === 0) return;
 
-  const empresaGuardadaId = localStorage.getItem(
-    "productos-empresa-seleccionada"
-  );
-
-  const empresaInicialId =
-    empresasData.find(
-      (empresa) => empresa.id === empresaGuardadaId
-    )?.id || empresasData[0].id;
-
+  const empresaInicialId = empresasData[0].id;
   setEmpresaId(empresaInicialId);
 
-  const periodosData = await obtenerPeriodosConDatosPorEmpresa(empresaInicialId);
+  const periodosData = await obtenerPeriodosPorEmpresa(empresaInicialId);
   setPeriodos(periodosData);
 
-  const periodoGuardadoId = localStorage.getItem(
-    `productos-periodo-${empresaInicialId}`
-  );
-
-  const periodoInicialId =
-    periodosData.find(
-      (periodo) => periodo.id === periodoGuardadoId
-    )?.id || obtenerPeriodoPredeterminado(periodosData);
-
-  setCanal(
-    localStorage.getItem(
-      `productos-canal-${empresaInicialId}`
-    ) || "todos"
-  );
+  const periodoInicialId = obtenerPeriodoPredeterminado(periodosData);
   setPeriodoId(periodoInicialId);
 
   await cargarDatos(empresaInicialId, periodoInicialId);
@@ -220,23 +167,12 @@ console.log("PRODUCTOS - RENTABILIDAD", filas);
 
   async function cambiarEmpresa(id: string) {
   setEmpresaId(id);
+  setCanal("todos");
 
-  const periodosData = await obtenerPeriodosConDatosPorEmpresa(id);
+  const periodosData = await obtenerPeriodosPorEmpresa(id);
   setPeriodos(periodosData);
 
-  const periodoGuardadoId = localStorage.getItem(
-    `productos-periodo-${id}`
-  );
-
-  const nuevoPeriodoId =
-    periodosData.find(
-      (periodo) => periodo.id === periodoGuardadoId
-    )?.id || obtenerPeriodoPredeterminado(periodosData);
-
-  setCanal(
-    localStorage.getItem(`productos-canal-${id}`) ||
-      "todos"
-  );
+  const nuevoPeriodoId = obtenerPeriodoPredeterminado(periodosData);
   setPeriodoId(nuevoPeriodoId);
 
   await cargarDatos(id, nuevoPeriodoId);
@@ -337,8 +273,6 @@ const productosSinCosto = rankingDelCanal.filter(
             <>
               <option value="Paradise">Paradise</option>
               <option value="PedidosYa">PedidosYa</option>
-              <option value="Salón">Salón</option>
-              <option value="Re Order">Re Order</option>
             </>
           ) : (
             <option value="Isatech">Isatech</option>
@@ -477,6 +411,7 @@ function Metric({ title, value }: { title: string; value: string | number }) {
 
 function TablaProductos({
   items,
+  totalVentas,
   mostrarComision,
 }: {
   items: ProductoConCanal[];
@@ -487,14 +422,17 @@ function TablaProductos({
     return <p>No hay datos para mostrar.</p>;
   }
 
+  const columnas = mostrarComision
+    ? "minmax(220px, 2fr) 110px 90px 110px 110px 135px 110px 90px"
+    : "minmax(220px, 2fr) 110px 90px 110px 110px 110px 90px";
+
   return (
-    <div>
-      <div style={{
-        ...tableHeader,
-        gridTemplateColumns: mostrarComision
-          ? "2fr 100px 80px 105px 105px 105px 105px 80px"
-          : "2fr 100px 80px 105px 105px 105px 80px",
-      }}>
+    <div style={tableViewport}>
+      <div style={tableInner}>
+        <div style={{
+          ...tableHeader,
+          gridTemplateColumns: columnas,
+        }}>
         <strong>Producto</strong>
         <strong>Canal</strong>
         <strong>Cantidad</strong>
@@ -514,9 +452,7 @@ function TablaProductos({
             key={`${item.id}-${item.nombre_producto}`}
             style={{
               ...tableRow,
-              gridTemplateColumns: mostrarComision
-                ? "2fr 100px 80px 105px 105px 105px 105px 80px"
-                : "2fr 100px 80px 105px 105px 105px 80px",
+              gridTemplateColumns: columnas,
             }}
           >
             <span>
@@ -563,6 +499,7 @@ function TablaProductos({
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -604,21 +541,30 @@ const metricCard: React.CSSProperties = {
   gap: 8,
 };
 
+const tableViewport: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "100%",
+  overflowX: "auto",
+  overflowY: "hidden",
+  WebkitOverflowScrolling: "touch",
+};
+
+const tableInner: React.CSSProperties = {
+  minWidth: 1010,
+};
+
 const tableHeader: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns:
-    "2fr 100px 80px 105px 105px 105px 105px 80px",
   gap: 12,
-  padding: "12px 0",
+  padding: "12px 8px",
   borderBottom: "2px solid #475569",
+  alignItems: "end",
 };
 
 const tableRow: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns:
-    "2fr 100px 80px 105px 105px 105px 105px 80px",
   gap: 12,
-  padding: "12px 0",
+  padding: "12px 8px",
   borderBottom: "1px solid #334155",
   alignItems: "center",
 };

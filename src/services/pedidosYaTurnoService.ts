@@ -267,6 +267,87 @@ function sumar(
   return resultado;
 }
 
+
+const TAMANIO_PAGINA_SUPABASE = 1000;
+
+async function cargarPedidosYaPaginados(input: {
+  empresa_id: string;
+  periodo_ids: string[];
+  sucursal_id?: string | null;
+}) {
+  const filas: any[] = [];
+
+  for (let desde = 0; ; desde += TAMANIO_PAGINA_SUPABASE) {
+    let query = supabase
+      .from("pedidosya_pedidos")
+      .select(`
+        turno,
+        estado_pedido,
+        total_parcial,
+        descuento_local,
+        comision,
+        iva_comision,
+        tarifa_pago_linea,
+        retencion_recuperable,
+        ingreso_estimado
+      `)
+      .eq("empresa_id", input.empresa_id)
+      .in("periodo_id", input.periodo_ids)
+      .range(
+        desde,
+        desde + TAMANIO_PAGINA_SUPABASE - 1
+      );
+
+    if (input.sucursal_id) {
+      query = query.eq("sucursal_id", input.sucursal_id);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const pagina = data || [];
+    filas.push(...pagina);
+
+    if (pagina.length < TAMANIO_PAGINA_SUPABASE) break;
+  }
+
+  return filas;
+}
+
+async function cargarProductosPedidoPaginados(input: {
+  empresa_id: string;
+  periodo_ids: string[];
+  sucursal_id?: string | null;
+}) {
+  const filas: any[] = [];
+
+  for (let desde = 0; ; desde += TAMANIO_PAGINA_SUPABASE) {
+    let query = supabase
+      .from("pedidosya_pedido_productos")
+      .select("turno, nombre_producto, cantidad")
+      .eq("empresa_id", input.empresa_id)
+      .in("periodo_id", input.periodo_ids)
+      .range(
+        desde,
+        desde + TAMANIO_PAGINA_SUPABASE - 1
+      );
+
+    if (input.sucursal_id) {
+      query = query.eq("sucursal_id", input.sucursal_id);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const pagina = data || [];
+    filas.push(...pagina);
+
+    if (pagina.length < TAMANIO_PAGINA_SUPABASE) break;
+  }
+
+  return filas;
+}
+
 export async function obtenerResumenPedidosYaPorTurno(input: {
   empresa_id: string;
   periodo_ids: string[];
@@ -311,34 +392,6 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     .eq("empresa_id", input.empresa_id)
     .eq("origen", "PedidosYa");
 
-  /*
-   * pedidosya_pedidos se consulta con la misma combinación verificada
-   * directamente en Supabase: empresa + periodo_id + sucursal.
-   * El campo turno ya está correctamente guardado en cada pedido,
-   * por lo que no se reinterpreta ni se deduplica.
-   */
-  let pedidosQuery = supabase
-    .from("pedidosya_pedidos")
-    .select(`
-      turno,
-      estado_pedido,
-      total_parcial,
-      descuento_local,
-      comision,
-      iva_comision,
-      tarifa_pago_linea,
-      retencion_recuperable,
-      ingreso_estimado
-    `)
-    .eq("empresa_id", input.empresa_id)
-    .in("periodo_id", input.periodo_ids);
-
-  let productosQuery = supabase
-    .from("pedidosya_pedido_productos")
-    .select("turno, nombre_producto, cantidad")
-    .eq("empresa_id", input.empresa_id)
-    .in("periodo_id", input.periodo_ids);
-
   let resumenProductosQuery = supabase
     .from("pedidosya_producto_resumen")
     .select(`
@@ -357,14 +410,6 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       "sucursal_id",
       input.sucursal_id
     );
-    pedidosQuery = pedidosQuery.eq(
-      "sucursal_id",
-      input.sucursal_id
-    );
-    productosQuery = productosQuery.eq(
-      "sucursal_id",
-      input.sucursal_id
-    );
     resumenProductosQuery = resumenProductosQuery.eq(
       "sucursal_id",
       input.sucursal_id
@@ -373,8 +418,8 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
 
   const [
     { data: ventas, error: ventasError },
-    { data: pedidos, error: pedidosError },
-    { data: productos, error: productosError },
+    pedidos,
+    productos,
     {
       data: resumenProductos,
       error: resumenProductosError,
@@ -383,8 +428,8 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     { data: vinculaciones, error: vinculacionesError },
   ] = await Promise.all([
     ventasQuery,
-    pedidosQuery,
-    productosQuery,
+    cargarPedidosYaPaginados(input),
+    cargarProductosPedidoPaginados(input),
     resumenProductosQuery,
     supabase
       .from("producto_costo_manual")
@@ -404,8 +449,6 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   ]);
 
   if (ventasError) throw ventasError;
-  if (pedidosError) throw pedidosError;
-  if (productosError) throw productosError;
   if (resumenProductosError) throw resumenProductosError;
   if (costosError) throw costosError;
   if (vinculacionesError) throw vinculacionesError;

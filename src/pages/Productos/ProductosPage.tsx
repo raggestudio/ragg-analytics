@@ -16,6 +16,13 @@ type ProductoConCanal = ProductoRentabilidadResumen & {
   comision?: number;
 };
 
+const CLAVE_EMPRESA_PRODUCTOS =
+  "productos-empresa-seleccionada";
+
+function clavePeriodoProductos(empresaId: string) {
+  return `productos-periodo-${empresaId}`;
+}
+
 function obtenerPeriodoPredeterminado(periodos: Periodo[]) {
   const hoy = new Date();
   const actual = periodos.find(
@@ -28,7 +35,12 @@ function obtenerPeriodoPredeterminado(periodos: Periodo[]) {
 
 export function ProductosPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [empresaId, setEmpresaId] = useState("");
+  const [empresaId, setEmpresaId] = useState(
+    () =>
+      localStorage.getItem(
+        CLAVE_EMPRESA_PRODUCTOS
+      ) || ""
+  );
   const [productos, setProductos] = useState<Producto[]>([]);
   const [ranking, setRanking] =
   useState<ProductoConCanal[]>([]);
@@ -50,16 +62,65 @@ export function ProductosPage() {
 
   if (empresasData.length === 0) return;
 
-  const empresaInicialId = empresasData[0].id;
-  setEmpresaId(empresaInicialId);
+  const empresaGuardadaId =
+    localStorage.getItem(
+      CLAVE_EMPRESA_PRODUCTOS
+    );
 
-  const periodosData = await obtenerPeriodosPorEmpresa(empresaInicialId);
+  const empresaInicial =
+    empresasData.find(
+      (empresa) =>
+        empresa.id === empresaGuardadaId
+    ) || empresasData[0];
+
+  const empresaInicialId =
+    empresaInicial.id;
+
+  setEmpresaId(empresaInicialId);
+  localStorage.setItem(
+    CLAVE_EMPRESA_PRODUCTOS,
+    empresaInicialId
+  );
+
+  const periodosData =
+    await obtenerPeriodosPorEmpresa(
+      empresaInicialId
+    );
+
   setPeriodos(periodosData);
 
-  const periodoInicialId = obtenerPeriodoPredeterminado(periodosData);
+  const periodoGuardado =
+    localStorage.getItem(
+      clavePeriodoProductos(
+        empresaInicialId
+      )
+    );
+
+  const periodoInicialId =
+    periodosData.some(
+      (periodo) =>
+        periodo.id === periodoGuardado
+    )
+      ? periodoGuardado || ""
+      : obtenerPeriodoPredeterminado(
+          periodosData
+        );
+
   setPeriodoId(periodoInicialId);
 
-  await cargarDatos(empresaInicialId, periodoInicialId);
+  if (periodoInicialId) {
+    localStorage.setItem(
+      clavePeriodoProductos(
+        empresaInicialId
+      ),
+      periodoInicialId
+    );
+  }
+
+  await cargarDatos(
+    empresaInicialId,
+    periodoInicialId
+  );
 }
 
   async function cargarDatos(
@@ -169,16 +230,55 @@ console.log("PRODUCTOS - RENTABILIDAD", filas);
   setEmpresaId(id);
   setCanal("todos");
 
-  const periodosData = await obtenerPeriodosPorEmpresa(id);
+  localStorage.setItem(
+    CLAVE_EMPRESA_PRODUCTOS,
+    id
+  );
+
+  const periodosData =
+    await obtenerPeriodosPorEmpresa(id);
+
   setPeriodos(periodosData);
 
-  const nuevoPeriodoId = obtenerPeriodoPredeterminado(periodosData);
+  const periodoGuardado =
+    localStorage.getItem(
+      clavePeriodoProductos(id)
+    );
+
+  const nuevoPeriodoId =
+    periodosData.some(
+      (periodo) =>
+        periodo.id === periodoGuardado
+    )
+      ? periodoGuardado || ""
+      : obtenerPeriodoPredeterminado(
+          periodosData
+        );
+
   setPeriodoId(nuevoPeriodoId);
 
-  await cargarDatos(id, nuevoPeriodoId);
+  if (nuevoPeriodoId) {
+    localStorage.setItem(
+      clavePeriodoProductos(id),
+      nuevoPeriodoId
+    );
+  }
+
+  await cargarDatos(
+    id,
+    nuevoPeriodoId
+  );
 }
 async function cambiarPeriodo(id: string) {
   setPeriodoId(id);
+
+  if (empresaId && id) {
+    localStorage.setItem(
+      clavePeriodoProductos(empresaId),
+      id
+    );
+  }
+
   await cargarDatos(empresaId, id);
 }
   async function guardarProducto() {

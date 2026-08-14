@@ -110,7 +110,7 @@ async function cargarVinculaciones(
 ) {
   const { data, error } = await supabase
     .from("producto_vinculacion")
-    .select("codigo_sistema, costo_manual_id")
+    .select("codigo_sistema, nombre_sistema, costo_manual_id")
     .eq("empresa_id", empresaId)
     .eq("sistema", sistema)
     .eq("activo", true);
@@ -121,10 +121,25 @@ async function cargarVinculaciones(
 
   for (const vinculacion of data || []) {
     if (vinculacion.codigo_sistema && vinculacion.costo_manual_id) {
+      const costoId = String(vinculacion.costo_manual_id);
+
+      // Clave principal guardada por el sistema (código Paradise/PedidosYa
+      // o nombre:<normalizado> para comprobantes manuales).
       mapa.set(
         String(vinculacion.codigo_sistema),
-        String(vinculacion.costo_manual_id)
+        costoId
       );
+
+      // Alias por nombre: permite que Salón/Re Order reutilicen una
+      // vinculación guardada con código Paradise cuando se trata del mismo
+      // producto. Sin este alias, el producto reaparecía como "sin costo"
+      // después del recálculo.
+      if (vinculacion.nombre_sistema) {
+        mapa.set(
+          `nombre:${normalizar(vinculacion.nombre_sistema)}`,
+          costoId
+        );
+      }
     }
   }
 
@@ -694,7 +709,12 @@ function aplicarExclusionesParadise(
       0
     );
 
+    // producto_ventas_resumen puede traer tanto `total` como `ventas`.
+    // construirFilas prioriza `total`, por eso ambos campos deben quedar
+    // corregidos; si solo cambiamos `ventas`, bajan las unidades pero no la
+    // facturación de Paradise.
     producto.ventas = ventasDespues;
+    producto.total = ventasDespues;
 
     /*
      * Si Paradise trae ganancia estimada,

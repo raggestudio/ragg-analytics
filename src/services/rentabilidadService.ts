@@ -278,7 +278,7 @@ function calcularCostoProducto(input: {
     buscarCostoManual(producto, contexto.costosManuales);
 
   const cantidad = Number(producto.cantidad || 0);
-  const ventas = Number(producto.total ?? producto.ventas ?? 0);
+  const ventas = Number(producto.ventas ?? producto.total ?? 0);
   const gananciaSistema = Number(producto.ganancia || 0);
 
   let tipoCalculo = regla?.tipo_calculo || "";
@@ -384,8 +384,8 @@ function construirFilas(input: {
     (total, producto) =>
       total +
       Number(
-        producto.total ??
-          producto.ventas ??
+        producto.ventas ??
+          producto.total ??
           0
       ),
     0
@@ -936,14 +936,27 @@ async function cargarProductosParadise(
       existente.cantidad =
         Number(existente.cantidad || 0) +
         Number(producto.cantidad || 0);
+
+      const ventasProducto = Number(
+        producto.ventas ?? producto.total ?? 0
+      );
+
       existente.ventas =
         Number(existente.ventas || 0) +
-        Number(producto.ventas || 0);
+        ventasProducto;
+
+      // Mantener `total` sincronizado porque construirFilas prioriza ese campo.
+      existente.total = existente.ventas;
     } else {
+      const ventasProducto = Number(
+        producto.ventas ?? producto.total ?? 0
+      );
+
       agrupados.set(clave, {
         ...producto,
         cantidad: Number(producto.cantidad || 0),
-        ventas: Number(producto.ventas || 0),
+        ventas: ventasProducto,
+        total: ventasProducto,
       });
     }
   }
@@ -990,14 +1003,27 @@ async function cargarProductosPedidosYa(
       existente.cantidad =
         Number(existente.cantidad || 0) +
         Number(producto.cantidad || 0);
+
+      const ventasProducto = Number(
+        producto.ventas ?? producto.total ?? 0
+      );
+
       existente.ventas =
         Number(existente.ventas || 0) +
-        Number(producto.ventas || 0);
+        ventasProducto;
+
+      // Mantener `total` sincronizado porque construirFilas prioriza ese campo.
+      existente.total = existente.ventas;
     } else {
+      const ventasProducto = Number(
+        producto.ventas ?? producto.total ?? 0
+      );
+
       agrupados.set(clave, {
         ...producto,
         cantidad: Number(producto.cantidad || 0),
-        ventas: Number(producto.ventas || 0),
+        ventas: ventasProducto,
+        total: ventasProducto,
       });
     }
   }

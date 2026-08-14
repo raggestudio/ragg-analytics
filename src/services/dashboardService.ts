@@ -34,6 +34,8 @@ retencion_recuperable_pedidosya: number;
 descuento_local_pedidosya: number;
 ventas_brutas_pedidosya: number;
   ventas_paradise: number;
+  ventas_salon: number;
+  ventas_reorder: number;
   unidades_paradise: number;
   costo_productos_paradise: number;
   margen_paradise: number;
@@ -258,6 +260,32 @@ export async function obtenerDashboardResumen(input: {
   const ventasParadise = (rentabilidad || [])
     .filter((item: any) => item.canal === "Paradise")
     .reduce((acc: number, item: any) => acc + Number(item.ventas || 0), 0);
+  const filasSalon = (rentabilidad || []).filter(
+    (item: any) => item.canal === "Salón"
+  );
+  const filasReOrder = (rentabilidad || []).filter(
+    (item: any) => item.canal === "Re Order"
+  );
+  const filasOtrosRestaurante = [
+    ...filasSalon,
+    ...filasReOrder,
+  ];
+
+  const ventasSalon = filasSalon.reduce(
+    (total: number, item: any) =>
+      total + Number(item.ventas || 0),
+    0
+  );
+
+  const ventasReOrder = filasReOrder.reduce(
+    (total: number, item: any) =>
+      total + Number(item.ventas || 0),
+    0
+  );
+
+  const ventasOtrosRestaurante =
+    ventasSalon + ventasReOrder;
+
   const filasPedidosYa = (rentabilidad || []).filter(
     (item: any) => item.canal === "PedidosYa"
   );
@@ -439,20 +467,41 @@ const costosCanal =
       0
     );
 
+  const costoOtrosRestaurante =
+    filasOtrosRestaurante.reduce(
+      (total: number, item: any) =>
+        total +
+        Number(item.costo_total || 0),
+      0
+    );
+
+  const margenOtrosRestaurante =
+    filasOtrosRestaurante.reduce(
+      (total: number, item: any) =>
+        total +
+        Number(item.margen || 0),
+      0
+    );
+
   const ventasTotalesAjustadas =
     esRestaurante
-      ? ventasParadise + ventasPedidosYaConTurnos
+      ? ventasParadise +
+        ventasPedidosYaConTurnos +
+        ventasOtrosRestaurante
       : ventasTotales;
 
   const costoTotalAjustado =
     esRestaurante
       ? costoParadise +
-        costoProductosPedidosYaConTurnos
+        costoProductosPedidosYaConTurnos +
+        costoOtrosRestaurante
       : costoTotal;
 
   const margenTotalAjustado =
     esRestaurante
-      ? margenParadise + margenPedidosYaConTurnos
+      ? margenParadise +
+        margenPedidosYaConTurnos +
+        margenOtrosRestaurante
       : margenTotal;
 
   const pedidosPedidosYaOriginal = (ventasPy || []).reduce(
@@ -547,10 +596,19 @@ const costosCanal =
         ventasPedidosYa - costoProductosPedidosYaPiu,
         0
       );
-  const margenLocal = Math.max(
-    ventasDirectas - costoProductosLocal,
-    0
-  );
+  const costoLocalFinal = esRestaurante
+    ? costoParadise +
+      costoOtrosRestaurante
+    : costoProductosLocal;
+
+  const margenLocal = esRestaurante
+    ? margenParadise +
+      margenOtrosRestaurante
+    : Math.max(
+        ventasDirectas -
+          costoProductosLocal,
+        0
+      );
   const utilidadNeta = margenTotalAjustado - gastosTotal;
 
   return {
@@ -659,6 +717,8 @@ ventas_brutas_pedidosya:
   ventasBrutasPedidosYaConTurnos,
 
 ventas_paradise: ventasParadise,
+ventas_salon: ventasSalon,
+ventas_reorder: ventasReOrder,
 unidades_paradise: unidadesParadise,
 costo_productos_paradise: costoParadise,
 margen_paradise: margenParadise,
@@ -682,7 +742,7 @@ margen_porcentaje_pedidosya:
       100
     : 0,
 unidades_local: unidadesLocal,
-costo_productos_local: costoProductosLocal,
+costo_productos_local: costoLocalFinal,
 margen_local: margenLocal,
 margen_porcentaje_local:
   ventasDirectas > 0
@@ -877,6 +937,12 @@ ventas_brutas_pedidosya:
   ventasBrutasPedidosYa,
     ventas_paradise: resumenes.reduce(
       (total, item) => total + Number(item.ventas_paradise || 0), 0
+    ),
+    ventas_salon: resumenes.reduce(
+      (total, item) => total + Number(item.ventas_salon || 0), 0
+    ),
+    ventas_reorder: resumenes.reduce(
+      (total, item) => total + Number(item.ventas_reorder || 0), 0
     ),
     unidades_paradise: resumenes.reduce(
       (total, item) =>

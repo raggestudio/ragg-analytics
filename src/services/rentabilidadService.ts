@@ -350,7 +350,7 @@ function calcularCostoProducto(input: {
 
 function construirFilas(input: {
   productos: any[];
-  canal: "Paradise" | "PedidosYa";
+  canal: "Paradise" | "PedidosYa" | "Salón" | "Re Order";
   empresa_id: string;
   periodo_id: string;
   sucursal_id?: string | null;
@@ -520,6 +520,374 @@ function construirFilas(input: {
   });
 }
 
+
+type ParadiseExclusionDetalle = {
+  nombre_producto: string;
+  cantidad: number;
+  total: number;
+};
+
+type VentaManualCabecera = {
+  id: string;
+  canal: "Salón" | "Re Order";
+  comprobante_id: string;
+  total: number;
+  envio?: number | null;
+};
+
+type VentaManualDetalle = {
+  venta_id: string;
+  nombre_producto: string;
+  categoria?: string | null;
+  cantidad: number;
+  total: number;
+};
+
+function similitudNombre(a: string, b: string) {
+  const pa = palabras(a);
+  const pb = palabras(b);
+
+  if (!pa.length || !pb.length) return 0;
+
+  const coincidencias = pa.filter((palabra) =>
+    pb.includes(palabra)
+  ).length;
+
+  return (
+    coincidencias /
+    Math.max(pa.length, pb.length)
+  );
+}
+
+async function cargarExclusionesParadise(
+  input: CalcularRentabilidadInput
+): Promise<ParadiseExclusionDetalle[]> {
+  let cabecerasQuery = supabase
+    .from("duna_paradise_exclusion")
+    .select("id")
+    .eq("empresa_id", input.empresa_id)
+    .eq("periodo_id", input.periodo_id)
+    .eq("activo", true);
+
+  if (input.sucursal_id) {
+    cabecerasQuery = cabecerasQuery.eq(
+      "sucursal_id",
+      input.sucursal_id
+    );
+  }
+
+  const {
+    data: cabeceras,
+    error: cabecerasError,
+  } = await cabecerasQuery;
+
+  if (cabecerasError) throw cabecerasError;
+
+  const ids = (cabeceras || []).map(
+    (item: any) => item.id
+  );
+
+  if (!ids.length) return [];
+
+  const { data, error } = await supabase
+    .from("duna_paradise_exclusion_detalle")
+    .select(
+      "nombre_producto, cantidad, total"
+    )
+    .in("exclusion_id", ids);
+
+  if (error) throw error;
+
+  return (data || []).map((item: any) => ({
+    nombre_producto: String(
+      item.nombre_producto || ""
+    ),
+    cantidad: Number(item.cantidad || 0),
+    total: Number(item.total || 0),
+  }));
+}
+
+function aplicarExclusionesParadise(
+  productosOriginales: any[],
+  exclusiones: ParadiseExclusionDetalle[]
+) {
+  const productos = productosOriginales.map(
+    (producto) => ({
+      ...producto,
+      cantidad: Number(
+        producto.cantidad || 0
+      ),
+      ventas: Number(
+        producto.ventas ??
+          producto.total ??
+          0
+      ),
+      ganancia: Number(
+        producto.ganancia || 0
+      ),
+    })
+  );
+
+  for (const exclusion of exclusiones) {
+    const nombreExclusion = normalizar(
+      exclusion.nombre_producto
+    );
+
+    let indice = productos.findIndex(
+      (producto) =>
+        normalizar(
+          producto.nombre_producto
+        ) === nombreExclusion
+    );
+
+    if (indice < 0) {
+      let mejorIndice = -1;
+      let mejorPuntaje = 0;
+
+      productos.forEach(
+        (producto, posicion) => {
+          const puntaje = similitudNombre(
+            String(
+              producto.nombre_producto || ""
+            ),
+            exclusion.nombre_producto
+          );
+
+          if (puntaje > mejorPuntaje) {
+            mejorPuntaje = puntaje;
+            mejorIndice = posicion;
+          }
+        }
+      );
+
+      if (mejorPuntaje >= 0.8) {
+        indice = mejorIndice;
+      }
+    }
+
+    if (indice < 0) {
+      console.warn(
+        "No se encontró producto Paradise para exclusión:",
+        exclusion.nombre_producto
+      );
+      continue;
+    }
+
+    const producto = productos[indice];
+
+    const ventasAntes = Number(
+      producto.ventas || 0
+    );
+    const gananciaAntes = Number(
+      producto.ganancia || 0
+    );
+
+    const ventasDespues = Math.max(
+      ventasAntes -
+        Number(exclusion.total || 0),
+      0
+    );
+
+    producto.cantidad = Math.max(
+      Number(producto.cantidad || 0) -
+        Number(exclusion.cantidad || 0),
+      0
+    );
+
+    producto.ventas = ventasDespues;
+
+    /*
+     * Si Paradise trae ganancia estimada,
+     * se reduce proporcionalmente para no
+     * conservar ganancia de la venta excluida.
+     */
+    if (
+      gananciaAntes > 0 &&
+      ventasAntes > 0
+    ) {
+      producto.ganancia =
+        gananciaAntes *
+        (ventasDespues / ventasAntes);
+    }
+  }
+
+  return productos.filter(
+    (producto) =>
+      Number(producto.cantidad || 0) > 0 ||
+      Number(producto.ventas || 0) > 0
+  );
+}
+
+async function cargarVentasManuales(
+  input: CalcularRentabilidadInput
+): Promise<{
+  salon: any[];
+  reorder: any[];
+}> {
+  let cabecerasQuery = supabase
+    .from("duna_venta_manual")
+    .select(
+      "id, canal, comprobante_id, total, envio"
+    )
+    .eq("empresa_id", input.empresa_id)
+    .eq("periodo_id", input.periodo_id)
+    .eq("activo", true);
+
+  if (input.sucursal_id) {
+    cabecerasQuery = cabecerasQuery.eq(
+      "sucursal_id",
+      input.sucursal_id
+    );
+  }
+
+  const {
+    data: cabecerasData,
+    error: cabecerasError,
+  } = await cabecerasQuery;
+
+  if (cabecerasError) throw cabecerasError;
+
+  const cabeceras =
+    (cabecerasData ||
+      []) as VentaManualCabecera[];
+
+  if (!cabeceras.length) {
+    return {
+      salon: [],
+      reorder: [],
+    };
+  }
+
+  const ids = cabeceras.map(
+    (venta) => venta.id
+  );
+
+  const {
+    data: detallesData,
+    error: detallesError,
+  } = await supabase
+    .from("duna_venta_manual_detalle")
+    .select(
+      "venta_id, nombre_producto, categoria, cantidad, total"
+    )
+    .in("venta_id", ids);
+
+  if (detallesError) throw detallesError;
+
+  const detalles =
+    (detallesData ||
+      []) as VentaManualDetalle[];
+
+  const porVenta = new Map<
+    string,
+    VentaManualDetalle[]
+  >();
+
+  for (const detalle of detalles) {
+    const lista =
+      porVenta.get(detalle.venta_id) || [];
+
+    lista.push(detalle);
+    porVenta.set(
+      detalle.venta_id,
+      lista
+    );
+  }
+
+  const salon: any[] = [];
+  const reorder: any[] = [];
+
+  for (const venta of cabeceras) {
+    const lineas =
+      porVenta.get(venta.id) || [];
+
+    if (!lineas.length) {
+      console.warn(
+        `Comprobante ${venta.comprobante_id} sin detalle.`
+      );
+      continue;
+    }
+
+    const envio =
+      venta.canal === "Re Order"
+        ? Math.max(
+            Number(venta.envio || 0),
+            0
+          )
+        : 0;
+
+    const totalTicket = Math.max(
+      Number(venta.total || 0),
+      0
+    );
+
+    const totalProductosEfectivo =
+      Math.max(totalTicket - envio, 0);
+
+    const brutoProductos =
+      lineas.reduce(
+        (total, linea) =>
+          total +
+          Number(linea.total || 0),
+        0
+      );
+
+    const factor =
+      brutoProductos > 0
+        ? totalProductosEfectivo /
+          brutoProductos
+        : 0;
+
+    const destino =
+      venta.canal === "Salón"
+        ? salon
+        : reorder;
+
+    for (const linea of lineas) {
+      destino.push({
+        nombre_producto:
+          linea.nombre_producto,
+        categoria:
+          linea.categoria || null,
+        cantidad: Number(
+          linea.cantidad || 0
+        ),
+        /*
+         * Los descuentos del ticket se
+         * distribuyen entre los productos.
+         * El envío se mantiene separado.
+         */
+        ventas:
+          Number(linea.total || 0) *
+          factor,
+        ganancia: 0,
+      });
+    }
+
+    if (envio > 0) {
+      destino.push({
+        nombre_producto:
+          "Envío Re Order",
+        categoria: "Envío",
+        cantidad: 1,
+        ventas: envio,
+        /*
+         * El envío no tiene costo de producto.
+         * Al indicar ganancia = venta, la lógica
+         * existente calcula costo 0 y margen
+         * igual al importe del envío.
+         */
+        ganancia: envio,
+      });
+    }
+  }
+
+  return {
+    salon,
+    reorder,
+  };
+}
+
 async function cargarProductosParadise(
   input: CalcularRentabilidadInput
 ) {
@@ -560,7 +928,18 @@ async function cargarProductosParadise(
     }
   }
 
-  return Array.from(agrupados.values());
+  const productosAgrupados =
+    Array.from(agrupados.values());
+
+  const exclusiones =
+    await cargarExclusionesParadise(
+      input
+    );
+
+  return aplicarExclusionesParadise(
+    productosAgrupados,
+    exclusiones
+  );
 }
 
 async function cargarProductosPedidosYa(
@@ -782,11 +1161,13 @@ export async function calcularRentabilidadPeriodo(
     productosParadise,
     productosPedidosYa,
     costosPedidosYa,
+    ventasManuales,
   ] = await Promise.all([
     cargarContextoCostos(input),
     cargarProductosParadise(input),
     cargarProductosPedidosYa(input),
     cargarCostosCanalPedidosYa(input),
+    cargarVentasManuales(input),
   ]);
 
   let deleteQuery = supabase
@@ -829,53 +1210,8 @@ if (deleteError) throw deleteError;
     contadores,
   });
 
-  /*
-   * Para PedidosYa, orderDetails es la fuente de verdad del total económico.
-   * El archivo de productos define mix, cantidades y costos. Ajustamos la
-   * venta bruta de cada producto proporcionalmente para que la suma coincida
-   * exactamente con la venta bruta del orderDetails.
-   */
-  const ventasProductosPedidosYa = productosPedidosYa.reduce(
-    (total, producto) =>
-      total +
-      Number(
-        producto.total ??
-          producto.ventas ??
-          0
-      ),
-    0
-  );
-
-  const productosPedidosYaAjustados =
-    productosPedidosYa.map((producto) => {
-      const ventaOriginal = Number(
-        producto.total ??
-          producto.ventas ??
-          0
-      );
-
-      const participacion =
-        ventasProductosPedidosYa > 0
-          ? ventaOriginal /
-            ventasProductosPedidosYa
-          : 0;
-
-      const ventaAjustada =
-        costosPedidosYa.ventas_brutas > 0 &&
-        ventasProductosPedidosYa > 0
-          ? costosPedidosYa.ventas_brutas *
-            participacion
-          : ventaOriginal;
-
-      return {
-        ...producto,
-        ventas: ventaAjustada,
-        total: ventaAjustada,
-      };
-    });
-
   const filasPedidosYa = construirFilas({
-  productos: productosPedidosYaAjustados,
+  productos: productosPedidosYa,
   canal: "PedidosYa",
   empresa_id: input.empresa_id,
   periodo_id: input.periodo_id,
@@ -902,7 +1238,36 @@ if (deleteError) throw deleteError;
   contadores,
 });
 
-  const filas = [...filasParadise, ...filasPedidosYa];
+  const filasSalon = construirFilas({
+    productos: ventasManuales.salon,
+    canal: "Salón",
+    empresa_id: input.empresa_id,
+    periodo_id: input.periodo_id,
+    sucursal_id: input.sucursal_id || null,
+    contexto,
+    vinculaciones:
+      new Map<string, string>(),
+    contadores,
+  });
+
+  const filasReOrder = construirFilas({
+    productos: ventasManuales.reorder,
+    canal: "Re Order",
+    empresa_id: input.empresa_id,
+    periodo_id: input.periodo_id,
+    sucursal_id: input.sucursal_id || null,
+    contexto,
+    vinculaciones:
+      new Map<string, string>(),
+    contadores,
+  });
+
+  const filas = [
+    ...filasParadise,
+    ...filasPedidosYa,
+    ...filasSalon,
+    ...filasReOrder,
+  ];
 
   if (filas.length > 0) {
     const { error: insertError } = await supabase
@@ -916,6 +1281,8 @@ if (deleteError) throw deleteError;
     productos: filas.length,
     productos_paradise: filasParadise.length,
     productos_pedidosya: filasPedidosYa.length,
+    productos_salon: filasSalon.length,
+    productos_reorder: filasReOrder.length,
     costo_promedio_kg: contexto.costoPromedioKg,
     kilos_produccion: 0,
     costo_total_produccion: 0,

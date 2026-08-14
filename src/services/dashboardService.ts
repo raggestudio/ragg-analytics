@@ -1,7 +1,6 @@
 import { supabase } from "../lib/supabase";
 import {
   obtenerResumenPedidosYaPorTurno,
-  type ResumenTurnoPedidosYa,
 } from "./pedidosYaTurnoService";
 
 export type DashboardResumen = {
@@ -283,9 +282,6 @@ export async function obtenerDashboardResumen(input: {
     0
   );
 
-  const ventasOtrosRestaurante =
-    ventasSalon + ventasReOrder;
-
   const filasPedidosYa = (rentabilidad || []).filter(
     (item: any) => item.canal === "PedidosYa"
   );
@@ -391,58 +387,6 @@ const costosCanal =
     resumenPedidosYaTurnos?.total.detalle_disponible
   );
 
-  const ventaContabilizadaTurno = (
-    turno: ResumenTurnoPedidosYa | null | undefined
-  ) => {
-    if (!turno) return 0;
-    return turno.detalle_disponible &&
-      turno.venta_efectiva > 0
-      ? turno.venta_efectiva
-      : turno.facturacion;
-  };
-
-  const ventasPedidosYaConTurnos =
-    resumenPedidosYaTurnos
-      ? ventaContabilizadaTurno(
-          resumenPedidosYaTurnos.mediodia
-        ) +
-        ventaContabilizadaTurno(
-          resumenPedidosYaTurnos.noche
-        )
-      : ventasPedidosYaRentabilidad;
-
-  const costoProductosPedidosYaConTurnos =
-    resumenPedidosYaTurnos
-      ? Number(
-          resumenPedidosYaTurnos.total
-            .costo_productos || 0
-        )
-      : costoProductosPedidosYa;
-
-  const margenPedidosYaConTurnos =
-    resumenPedidosYaTurnos
-      ? Number(
-          resumenPedidosYaTurnos.total
-            .ganancia_neta || 0
-        )
-      : margenPedidosYa;
-
-  const ventasBrutasPedidosYaConTurnos =
-    resumenPedidosYaTurnos
-      ? [
-          resumenPedidosYaTurnos.mediodia,
-          resumenPedidosYaTurnos.noche,
-        ].reduce(
-          (total, turno) =>
-            total +
-            (turno.detalle_disponible &&
-            turno.ventas_brutas > 0
-              ? turno.ventas_brutas
-              : turno.facturacion),
-          0
-        )
-      : ventasBrutasPedidosYa;
-
   const costoParadise = (rentabilidad || [])
     .filter((item: any) => item.canal === "Paradise")
     .reduce(
@@ -483,26 +427,15 @@ const costosCanal =
       0
     );
 
-  const ventasTotalesAjustadas =
-    esRestaurante
-      ? ventasParadise +
-        ventasPedidosYaConTurnos +
-        ventasOtrosRestaurante
-      : ventasTotales;
-
-  const costoTotalAjustado =
-    esRestaurante
-      ? costoParadise +
-        costoProductosPedidosYaConTurnos +
-        costoOtrosRestaurante
-      : costoTotal;
-
-  const margenTotalAjustado =
-    esRestaurante
-      ? margenParadise +
-        margenPedidosYaConTurnos +
-        margenOtrosRestaurante
-      : margenTotal;
+  /*
+   * Fuente única para Facturación, Costo y Margen:
+   * rentabilidad_periodo.
+   * El análisis por turno sigue disponible como detalle,
+   * pero no sustituye los totales generales.
+   */
+  const ventasTotalesAjustadas = ventasTotales;
+  const costoTotalAjustado = costoTotal;
+  const margenTotalAjustado = margenTotal;
 
   const pedidosPedidosYaOriginal = (ventasPy || []).reduce(
     (acc, item: any) => acc + Number(item.pedidos || 0),
@@ -520,7 +453,7 @@ const costosCanal =
       )
     : pedidosPedidosYaOriginal;
   const ventasPedidosYa = esRestaurante
-    ? ventasPedidosYaConTurnos
+    ? ventasPedidosYaRentabilidad
     : ventasPedidosYaOriginal;
 
   const deliveryPedidosYa = (ventasPy || []).reduce(
@@ -588,10 +521,10 @@ const costosCanal =
     0
   );
   const costoPedidosYaFinal = esRestaurante
-    ? costoProductosPedidosYaConTurnos
+    ? costoProductosPedidosYa
     : costoProductosPedidosYaPiu;
   const margenPedidosYaFinal = esRestaurante
-    ? margenPedidosYaConTurnos
+    ? margenPedidosYa
     : Math.max(
         ventasPedidosYa - costoProductosPedidosYaPiu,
         0
@@ -653,68 +586,28 @@ const costosCanal =
     sabores_producidos: saboresProducidos,
 
     productos_sin_revisar: productosSinRevisar,
-    costos_canal: resumenPedidosYaTurnos
-      ? Number(
-          (resumenPedidosYaTurnos?.total.comision ||
-            0) +
-            (resumenPedidosYaTurnos?.total
-              .iva_comision || 0) +
-            (resumenPedidosYaTurnos?.total
-              .tarifa_pago_linea || 0)
-        )
-      : costosCanal,
+    costos_canal: costosCanal,
 
 comision_pedidosya:
-  resumenPedidosYaTurnos
-    ? Number(
-        resumenPedidosYaTurnos?.total.comision || 0
-      )
-    : comisionPedidosYa,
+  comisionPedidosYa,
 
 iva_comision_pedidosya:
-  resumenPedidosYaTurnos
-    ? Number(
-        resumenPedidosYaTurnos?.total
-          .iva_comision || 0
-      )
-    : ivaComisionPedidosYa,
+  ivaComisionPedidosYa,
 
 comision_mas_iva_pedidosya:
-  resumenPedidosYaTurnos
-    ? Number(
-        (resumenPedidosYaTurnos?.total.comision ||
-          0) +
-          (resumenPedidosYaTurnos?.total
-            .iva_comision || 0)
-      )
-    : comisionMasIvaPedidosYa,
+  comisionMasIvaPedidosYa,
 
 tarifa_pago_linea_pedidosya:
-  resumenPedidosYaTurnos
-    ? Number(
-        resumenPedidosYaTurnos?.total
-          .tarifa_pago_linea || 0
-      )
-    : tarifaPagoLineaPedidosYa,
+  tarifaPagoLineaPedidosYa,
 
 retencion_recuperable_pedidosya:
-  resumenPedidosYaTurnos
-    ? Number(
-        resumenPedidosYaTurnos?.total
-          .retencion_recuperable || 0
-      )
-    : retencionRecuperablePedidosYa,
+  retencionRecuperablePedidosYa,
 
 descuento_local_pedidosya:
-  resumenPedidosYaTurnos
-    ? Number(
-        resumenPedidosYaTurnos?.total
-          .descuento_local || 0
-      )
-    : descuentoLocalPedidosYa,
+  descuentoLocalPedidosYa,
 
 ventas_brutas_pedidosya:
-  ventasBrutasPedidosYaConTurnos,
+  ventasBrutasPedidosYa,
 
 ventas_paradise: ventasParadise,
 ventas_salon: ventasSalon,

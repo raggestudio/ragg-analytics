@@ -348,6 +348,45 @@ async function cargarProductosPedidoPaginados(input: {
   return filas;
 }
 
+
+async function cargarResumenProductosPaginados(input: {
+  empresa_id: string;
+  periodo_ids: string[];
+  sucursal_id?: string | null;
+}) {
+  const filas: any[] = [];
+
+  for (let desde = 0; ; desde += TAMANIO_PAGINA_SUPABASE) {
+    let query = supabase
+      .from("pedidosya_producto_resumen")
+      .select(`
+        turno,
+        nombre_producto,
+        cantidad,
+        ventas,
+        periodo_id,
+        periodo_anio,
+        periodo_mes
+      `)
+      .eq("empresa_id", input.empresa_id)
+      .range(desde, desde + TAMANIO_PAGINA_SUPABASE - 1);
+
+    if (input.sucursal_id) {
+      query = query.eq("sucursal_id", input.sucursal_id);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const pagina = data || [];
+    filas.push(...pagina);
+
+    if (pagina.length < TAMANIO_PAGINA_SUPABASE) break;
+  }
+
+  return filas;
+}
+
 export async function obtenerResumenPedidosYaPorTurno(input: {
   empresa_id: string;
   periodo_ids: string[];
@@ -392,45 +431,26 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     .eq("empresa_id", input.empresa_id)
     .eq("origen", "PedidosYa");
 
-  let resumenProductosQuery = supabase
-    .from("pedidosya_producto_resumen")
-    .select(`
-      turno,
-      nombre_producto,
-      cantidad,
-      ventas,
-      periodo_id,
-      periodo_anio,
-      periodo_mes
-    `)
-    .eq("empresa_id", input.empresa_id);
-
   if (input.sucursal_id) {
     ventasQuery = ventasQuery.eq(
       "sucursal_id",
       input.sucursal_id
     );
-    resumenProductosQuery = resumenProductosQuery.eq(
-      "sucursal_id",
-      input.sucursal_id
-    );
   }
+
 
   const [
     { data: ventas, error: ventasError },
     pedidos,
     productos,
-    {
-      data: resumenProductos,
-      error: resumenProductosError,
-    },
+    resumenProductos,
     { data: costos, error: costosError },
     { data: vinculaciones, error: vinculacionesError },
   ] = await Promise.all([
     ventasQuery,
     cargarPedidosYaPaginados(input),
     cargarProductosPedidoPaginados(input),
-    resumenProductosQuery,
+    cargarResumenProductosPaginados(input),
     supabase
       .from("producto_costo_manual")
       .select("id, nombre_producto, costo")
@@ -449,7 +469,6 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
   ]);
 
   if (ventasError) throw ventasError;
-  if (resumenProductosError) throw resumenProductosError;
   if (costosError) throw costosError;
   if (vinculacionesError) throw vinculacionesError;
 

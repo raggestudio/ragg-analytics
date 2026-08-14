@@ -273,6 +273,8 @@ const productosSinCosto = rankingDelCanal.filter(
             <>
               <option value="Paradise">Paradise</option>
               <option value="PedidosYa">PedidosYa</option>
+              <option value="Salón">Salón</option>
+              <option value="Re Order">Re Order</option>
             </>
           ) : (
             <option value="Isatech">Isatech</option>
@@ -346,17 +348,17 @@ const productosSinCosto = rankingDelCanal.filter(
 
       <section style={card}>
         <h3>Top 10 por ventas</h3>
-        <TablaProductos items={topVentas} totalVentas={totalVentas} mostrarComision={esRestaurante} />
+        <TablaProductos items={topVentas} mostrarComision={esRestaurante} />
       </section>
 
       <section style={card}>
         <h3>Top 10 por ganancia</h3>
-        <TablaProductos items={topGanancia} totalVentas={totalVentas} mostrarComision={esRestaurante} />
+        <TablaProductos items={topGanancia} mostrarComision={esRestaurante} />
       </section>
 
       <section style={card}>
         <h3>Menos vendidos</h3>
-        <TablaProductos items={menosVendidos} totalVentas={totalVentas} mostrarComision={esRestaurante} />
+        <TablaProductos items={menosVendidos} mostrarComision={esRestaurante} />
       </section>
 
       <section style={card}>
@@ -411,11 +413,9 @@ function Metric({ title, value }: { title: string; value: string | number }) {
 
 function TablaProductos({
   items,
-  totalVentas,
   mostrarComision,
 }: {
   items: ProductoConCanal[];
-  totalVentas: number;
   mostrarComision: boolean;
 }) {
   if (items.length === 0) {

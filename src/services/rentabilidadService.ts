@@ -975,21 +975,113 @@ async function cargarProductosParadise(
   );
 }
 
+
+const TAMANIO_PAGINA_RENTABILIDAD = 1000;
+
+async function cargarProductosPedidosYaPaginados(
+  input: CalcularRentabilidadInput
+) {
+  const filas: any[] = [];
+
+  for (let desde = 0; ; desde += TAMANIO_PAGINA_RENTABILIDAD) {
+    let query = supabase
+      .from("pedidosya_producto_resumen")
+      .select("*")
+      .eq("empresa_id", input.empresa_id)
+      .eq("periodo_id", input.periodo_id)
+      .range(desde, desde + TAMANIO_PAGINA_RENTABILIDAD - 1);
+
+    if (input.sucursal_id) {
+      query = query.eq("sucursal_id", input.sucursal_id);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const pagina = data || [];
+    filas.push(...pagina);
+
+    if (pagina.length < TAMANIO_PAGINA_RENTABILIDAD) break;
+  }
+
+  return filas;
+}
+
+async function cargarPedidosYaDetallePaginados(
+  input: CalcularRentabilidadInput
+) {
+  const filas: any[] = [];
+
+  for (let desde = 0; ; desde += TAMANIO_PAGINA_RENTABILIDAD) {
+    let query = supabase
+      .from("pedidosya_pedidos")
+      .select(`
+        estado_pedido,
+        total_parcial,
+        descuento_local,
+        descuento_pedidosya,
+        comision,
+        tarifa_pago_linea,
+        cargos,
+        cargo_impositivo,
+        impuestos,
+        ingreso_estimado
+      `)
+      .eq("empresa_id", input.empresa_id)
+      .eq("periodo_id", input.periodo_id)
+      .range(desde, desde + TAMANIO_PAGINA_RENTABILIDAD - 1);
+
+    if (input.sucursal_id) {
+      query = query.eq("sucursal_id", input.sucursal_id);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const pagina = data || [];
+    filas.push(...pagina);
+
+    if (pagina.length < TAMANIO_PAGINA_RENTABILIDAD) break;
+  }
+
+  return filas;
+}
+
+function ajustarVentasProductosAlTotal(
+  productos: any[],
+  totalObjetivo: number
+) {
+  if (totalObjetivo <= 0 || productos.length === 0) return productos;
+
+  const totalActual = productos.reduce(
+    (total, producto) =>
+      total + Number(producto.ventas ?? producto.total ?? 0),
+    0
+  );
+
+  if (totalActual <= 0) return productos;
+
+  const factor = totalObjetivo / totalActual;
+
+  return productos.map((producto) => {
+    const ventasOriginales = Number(
+      producto.ventas ?? producto.total ?? 0
+    );
+    const ventasAjustadas = ventasOriginales * factor;
+
+    return {
+      ...producto,
+      ventas: ventasAjustadas,
+      total: ventasAjustadas,
+    };
+  });
+}
+
 async function cargarProductosPedidosYa(
   input: CalcularRentabilidadInput
 ) {
-  let query = supabase
-    .from("pedidosya_producto_resumen")
-    .select("*")
-    .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id);
-
-  if (input.sucursal_id) {
-    query = query.eq("sucursal_id", input.sucursal_id);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
+  const data =
+    await cargarProductosPedidosYaPaginados(input);
 
   const agrupados = new Map<string, any>();
 
@@ -1034,35 +1126,8 @@ async function cargarProductosPedidosYa(
 async function cargarCostosCanalPedidosYa(
   input: CalcularRentabilidadInput
 ) {
-  let query = supabase
-    .from("pedidosya_pedidos")
-    .select(`
-      estado_pedido,
-      total_parcial,
-      descuento_local,
-      descuento_pedidosya,
-      comision,
-      tarifa_pago_linea,
-      cargos,
-      cargo_impositivo,
-      impuestos,
-      ingreso_estimado
-    `)
-    .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id);
-
-  if (input.sucursal_id) {
-    query = query.eq(
-      "sucursal_id",
-      input.sucursal_id
-    );
-  } else {
-    query = query.is("sucursal_id", null);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
+  const data =
+    await cargarPedidosYaDetallePaginados(input);
 
   const pedidosContabilizables = (
     data || []
@@ -1256,8 +1321,19 @@ if (deleteError) throw deleteError;
     contadores,
   });
 
+  /*
+   * Si existe orderDetails, su venta bruta es la fuente de verdad.
+   * El resumen por producto se ajusta proporcionalmente para que
+   * Dashboard, Rentabilidad y Productos usen exactamente el mismo total.
+   */
+  const productosPedidosYaAjustados =
+    ajustarVentasProductosAlTotal(
+      productosPedidosYa,
+      Number(costosPedidosYa.ventas_brutas || 0)
+    );
+
   const filasPedidosYa = construirFilas({
-  productos: productosPedidosYa,
+  productos: productosPedidosYaAjustados,
   canal: "PedidosYa",
   empresa_id: input.empresa_id,
   periodo_id: input.periodo_id,

@@ -61,6 +61,12 @@ import {
   calcularYGuardarConciliacionPiu,
   type ConciliacionPiu,
 } from "../../services/conciliacionPiuService";
+import {
+  parsearFilasReOrder,
+} from "../../services/reOrderParser";
+import {
+  reemplazarVentasReOrder,
+} from "../../services/reOrderService";
 
 const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
@@ -77,6 +83,7 @@ type TipoImportacion =
   | "produccion_excel"
   | "costos_excel"
   | "costos_duna_excel"
+  | "reorder_productos_csv"
   | "berlin_infoclub_excel"
   | "berlin_historico_no_excel"
   | "berlin_costos_excel"
@@ -124,6 +131,10 @@ const OPCIONES_RESTAURANTE: OpcionImportacion[] = [
     label: "PedidosYa noche - orderDetails CSV",
   },
   { value: "paradise_pdf", label: "Paradise PDF" },
+  {
+    value: "reorder_productos_csv",
+    label: "Re Order - ventas por producto CSV",
+  },
   {
     value: "costos_duna_excel",
     label: "Costos Duna Excel",
@@ -730,6 +741,43 @@ export function ImportacionesPage() {
         );
       }
 
+      if (tipoImportacion === "reorder_productos_csv") {
+        const preview = await leerCsv(archivo);
+        setCsvFilas(preview.filas);
+
+        const productos = parsearFilasReOrder(
+          preview.filas
+        );
+
+        if (!productos.length) {
+          throw new Error(
+            "El CSV de Re Order no contiene productos con ventas."
+          );
+        }
+
+        const resultado =
+          await reemplazarVentasReOrder({
+            empresa_id: empresaId,
+            sucursal_id: sucursalId,
+            periodo_id: periodo.id,
+            periodo_anio: periodo.anio,
+            periodo_mes: periodo.mes,
+            productos,
+          });
+
+        await registrarImportacion({
+          archivo,
+          registros: resultado.productos,
+        });
+
+        setMensaje(
+          `Re Order importado: ${resultado.productos} productos, ` +
+            `${resultado.unidades.toLocaleString("es-UY")} unidades y ` +
+            `${moneda(resultado.ventas)} en ventas. ` +
+            `La carga anterior de Re Order para este período fue reemplazada.`
+        );
+      }
+
       if (tipoImportacion === "costos_duna_excel") {
         const resultado = await parsearExcelCostosDuna(archivo);
         const importacion = await importarCostosManualesDuna({
@@ -897,7 +945,7 @@ export function ImportacionesPage() {
 
     setCalculando(true);
     setMensaje(
-      "Calculando Paradise + PedidosYa..."
+      "Calculando Paradise + PedidosYa + Salón + Re Order..."
     );
 
     const resultado =
@@ -1051,6 +1099,11 @@ export function ImportacionesPage() {
             <EstadoItem
               label="Paradise"
               tipo="paradise_pdf"
+              usaSucursal
+            />
+            <EstadoItem
+              label="Re Order"
+              tipo="reorder_productos_csv"
               usaSucursal
             />
             <EstadoItem

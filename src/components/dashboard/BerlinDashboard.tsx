@@ -95,6 +95,35 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
     };
   }, [ventas, costos, config, vista]);
 
+  const participacionModalidades = useMemo(() => {
+    const facturacionTotal = ventas.reduce(
+      (total, venta) => total + Number(venta.venta_total || 0),
+      0
+    );
+
+    const facturacionPorModalidad = ventas.reduce(
+      (acumulado, venta) => {
+        const modalidad = venta.modalidad as Vista;
+        if (modalidad === "salon" || modalidad === "delivery" || modalidad === "take_away") {
+          acumulado[modalidad] += Number(venta.venta_total || 0);
+        }
+        return acumulado;
+      },
+      { salon: 0, delivery: 0, take_away: 0 }
+    );
+
+    const porcentajeModalidad = (modalidad: "salon" | "delivery" | "take_away") =>
+      facturacionTotal > 0
+        ? (facturacionPorModalidad[modalidad] / facturacionTotal) * 100
+        : 0;
+
+    return {
+      salon: porcentajeModalidad("salon"),
+      takeAway: porcentajeModalidad("take_away"),
+      delivery: porcentajeModalidad("delivery"),
+    };
+  }, [ventas]);
+
   const topVendidos = [...analisis.lista].sort((a, b) => b.unidades - a.unidades).slice(0, 10);
   const menosVendidos = [...analisis.lista].filter((p) => p.unidades > 0)
     .sort((a, b) => a.unidades - b.unidades || a.facturacion - b.facturacion).slice(0, 10);
@@ -142,9 +171,15 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
         <Metric title="Costo de productos" value={moneda(analisis.costo)} />
         <Metric title="Ganancia" value={moneda(analisis.ganancia)} />
         <Metric title={analisis.sinCosto ? "Margen provisorio" : "Margen"} value={`${analisis.margen.toFixed(1)}%`} />
-        <Metric title="Tickets" value={analisis.tickets.toLocaleString("es-UY")} />
+        {vista === "total" ? <>
+          <Metric title="% Salón" value={`${participacionModalidades.salon.toFixed(1)}%`} />
+          <Metric title="% Take Away" value={`${participacionModalidades.takeAway.toFixed(1)}%`} />
+          <Metric title="% Delivery" value={`${participacionModalidades.delivery.toFixed(1)}%`} />
+        </> : <>
+          <Metric title="Tickets" value={analisis.tickets.toLocaleString("es-UY")} />
+          <Metric title="Unidades" value={analisis.unidades.toLocaleString("es-UY")} />
+        </>}
         <Metric title="Ticket promedio" value={moneda(analisis.tickets ? analisis.facturacion / analisis.tickets : 0)} />
-        <Metric title="Unidades" value={analisis.unidades.toLocaleString("es-UY")} />
         <Metric title="Productos sin costo" value={analisis.sinCosto} />
         <Metric title="Productos sin categoría" value={analisis.sinCategoria} />
       </div>

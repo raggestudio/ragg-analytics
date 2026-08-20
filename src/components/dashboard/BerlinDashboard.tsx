@@ -182,11 +182,9 @@ export default function BerlinDashboard({ empresaId, periodoIds, sucursalId }: P
         <Metric title="Ticket promedio" value={moneda(analisis.tickets ? analisis.facturacion / analisis.tickets : 0)} />
         <Metric title="Productos sin costo" value={analisis.sinCosto} />
         <Metric title="Productos sin categoría" value={analisis.sinCategoria} />
+        {vista === "total" && <Metric title="Gastos operativos" value={moneda(gastosTotal)} />}
       </div>
       {vista === "total" && <>
-        <div style={metrics}>
-          <Metric title="Gastos operativos" value={moneda(gastosTotal)} />
-        </div>
         <div style={{
           ...utilidadCard,
           borderColor: utilidadNeta >= 0 ? "#22c55e" : "#ef4444",

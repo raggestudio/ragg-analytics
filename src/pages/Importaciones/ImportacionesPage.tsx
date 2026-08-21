@@ -57,16 +57,11 @@ import {
   leerInfoClubBerlin,
 } from "../../services/berlinExcelParsers";
 import { reemplazarVentasBerlin } from "../../services/berlinService";
+import { leerComprobantesBerlinExcel } from "../../services/berlinComprobantesExcelParser";
 import {
   calcularYGuardarConciliacionPiu,
   type ConciliacionPiu,
 } from "../../services/conciliacionPiuService";
-import {
-  parsearFilasReOrder,
-} from "../../services/reOrderParser";
-import {
-  reemplazarVentasReOrder,
-} from "../../services/reOrderService";
 
 const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
@@ -83,7 +78,6 @@ type TipoImportacion =
   | "produccion_excel"
   | "costos_excel"
   | "costos_duna_excel"
-  | "reorder_productos_csv"
   | "berlin_infoclub_excel"
   | "berlin_historico_no_excel"
   | "berlin_costos_excel"
@@ -132,10 +126,6 @@ const OPCIONES_RESTAURANTE: OpcionImportacion[] = [
   },
   { value: "paradise_pdf", label: "Paradise PDF" },
   {
-    value: "reorder_productos_csv",
-    label: "Re Order - ventas por producto CSV",
-  },
-  {
     value: "costos_duna_excel",
     label: "Costos Duna Excel",
   },
@@ -145,9 +135,9 @@ const OPCIONES_BERLIN: OpcionImportacion[] = [
   { value: "berlin_infoclub_excel", label: "InfoClub Excel · Salón" },
   { value: "berlin_historico_no_excel", label: "Histórico Facturado = NO · Junio" },
   { value: "berlin_costos_excel", label: "Costos Berlín Excel" },
-  { value: "berlin_ocr_salon", label: "Comprobantes OCR · Salón (próximamente)" },
-  { value: "berlin_ocr_delivery", label: "Comprobantes OCR · Delivery (próximamente)" },
-  { value: "berlin_ocr_takeaway", label: "Comprobantes OCR · Take away (próximamente)" },
+  { value: "berlin_ocr_salon", label: "Comprobantes Excel · Salón" },
+  { value: "berlin_ocr_delivery", label: "Comprobantes Excel · Delivery" },
+  { value: "berlin_ocr_takeaway", label: "Comprobantes Excel · Take away" },
 ];
 
 type RentabilidadConCanal = RentabilidadProducto & {
@@ -533,8 +523,42 @@ export function ImportacionesPage() {
         tipoImportacion === "berlin_ocr_delivery" ||
         tipoImportacion === "berlin_ocr_takeaway"
       ) {
-        throw new Error(
-          "La carga OCR por modalidad ya está prevista, pero se habilitará al conectar el lector. Para junio usá el histórico Facturado = NO."
+        const modalidad = tipoImportacion === "berlin_ocr_salon"
+          ? "salon"
+          : tipoImportacion === "berlin_ocr_delivery"
+            ? "delivery"
+            : "take_away";
+
+        const ventasLeidas = await leerComprobantesBerlinExcel(archivo, modalidad);
+        const ventas = ventasLeidas.filter((venta) => {
+          const fecha = new Date(`${venta.fecha}T12:00:00`);
+          return fecha.getFullYear() === Number(periodo.anio) &&
+            fecha.getMonth() + 1 === Number(periodo.mes);
+        });
+
+        if (!ventas.length) {
+          throw new Error(`El archivo no contiene comprobantes de ${periodo.nombre}.`);
+        }
+
+        const fuente = modalidad === "salon"
+          ? "ocr_salon"
+          : modalidad === "delivery"
+            ? "ocr_delivery"
+            : "ocr_takeaway";
+
+        const resultado = await reemplazarVentasBerlin({
+          empresa_id: empresaId,
+          sucursal_id: sucursalId || null,
+          periodo_id: periodo.id,
+          periodo_anio: periodo.anio,
+          periodo_mes: periodo.mes,
+          fuente,
+          ventas,
+        });
+
+        await registrarImportacion({ archivo, registros: resultado.importados });
+        setMensaje(
+          `Comprobantes Berlín · ${modalidad} importados: ${resultado.importados} líneas y ${moneda(resultado.ventas)}.`
         );
       }
 
@@ -741,43 +765,6 @@ export function ImportacionesPage() {
         );
       }
 
-      if (tipoImportacion === "reorder_productos_csv") {
-        const preview = await leerCsv(archivo);
-        setCsvFilas(preview.filas);
-
-        const productos = parsearFilasReOrder(
-          preview.filas
-        );
-
-        if (!productos.length) {
-          throw new Error(
-            "El CSV de Re Order no contiene productos con ventas."
-          );
-        }
-
-        const resultado =
-          await reemplazarVentasReOrder({
-            empresa_id: empresaId,
-            sucursal_id: sucursalId,
-            periodo_id: periodo.id,
-            periodo_anio: periodo.anio,
-            periodo_mes: periodo.mes,
-            productos,
-          });
-
-        await registrarImportacion({
-          archivo,
-          registros: resultado.productos,
-        });
-
-        setMensaje(
-          `Re Order importado: ${resultado.productos} productos, ` +
-            `${resultado.unidades.toLocaleString("es-UY")} unidades y ` +
-            `${moneda(resultado.ventas)} en ventas. ` +
-            `La carga anterior de Re Order para este período fue reemplazada.`
-        );
-      }
-
       if (tipoImportacion === "costos_duna_excel") {
         const resultado = await parsearExcelCostosDuna(archivo);
         const importacion = await importarCostosManualesDuna({
@@ -945,7 +932,7 @@ export function ImportacionesPage() {
 
     setCalculando(true);
     setMensaje(
-      "Calculando Paradise + PedidosYa + Salón + Re Order..."
+      "Calculando Paradise + PedidosYa..."
     );
 
     const resultado =
@@ -1099,11 +1086,6 @@ export function ImportacionesPage() {
             <EstadoItem
               label="Paradise"
               tipo="paradise_pdf"
-              usaSucursal
-            />
-            <EstadoItem
-              label="Re Order"
-              tipo="reorder_productos_csv"
               usaSucursal
             />
             <EstadoItem

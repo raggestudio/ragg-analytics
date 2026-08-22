@@ -93,5 +93,13 @@ export async function obtenerVentasBerlin(input: { empresa_id: string; periodo_i
     desde += tamanoPagina;
   }
 
-  return todas;
+  // Normalizamos también al LEER. Esto hace que registros históricos
+  // que hayan quedado guardados con un nombre OCR viejo (por ejemplo
+  // MOZZARELLA) se agrupen con el alias correcto sin necesitar migrar
+  // manualmente cada fila existente en la base.
+  return todas.map((venta) => ({
+    ...venta,
+    nombre_normalizado: normalizarProductoBerlin(venta.nombre_producto),
+    nombre_producto: nombreProductoBerlin(venta.nombre_producto),
+  }));
 }

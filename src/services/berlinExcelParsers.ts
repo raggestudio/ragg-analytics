@@ -143,6 +143,20 @@ export function normalizarProductoBerlin(value: string) {
     "dec arrito": "hamburguesa de carrito",
     "decarrito": "hamburguesa de carrito",
     "hamburguesa de carrito": "hamburguesa de carrito",
+
+    // Correcciones OCR / alias de Berlín
+    "mozzarella": "muzzarella",
+    "muzezarella": "muzzarella",
+    "muzzarella": "muzzarella",
+    "vegetariana baxea": "vegetariana",
+    "derribando sin miercole": "derribando muros",
+    "derrieando moos": "derribando muros",
+    "derribando miros": "derribando muros",
+    "papas eritas": "papas fritas",
+    "chedear": "cheddar",
+    "aliolz": "alioli",
+    "aros": "aros de cebolla",
+    "burger sin bapas": "burger sin papas",
   };
 
   return alias[nombre] || nombre;
@@ -157,6 +171,14 @@ export function nombreProductoBerlin(value: string) {
     "crumble de manzana": "CRUMBLE DE MANZANA",
     "brownie chocolate y nuez": "BROWNIE DE CHOCOLATE Y NUEZ",
     "hamburguesa de carrito": "HAMBURGUESA DE CARRITO",
+    "muzzarella": "MUZZARELLA",
+    "vegetariana": "VEGETARIANA",
+    "derribando muros": "DERRIBANDO MUROS",
+    "papas fritas": "PAPAS FRITAS",
+    "cheddar": "CHEDDAR",
+    "alioli": "ALIOLI",
+    "aros de cebolla": "AROS DE CEBOLLA",
+    "burger sin papas": "BURGER SIN PAPAS",
   };
 
   return nombres[nombre] || texto(value);

@@ -65,6 +65,15 @@ import {
 
 const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
+function invalidarCacheDashboard() {
+  for (let indice = sessionStorage.length - 1; indice >= 0; indice -= 1) {
+    const clave = sessionStorage.key(indice);
+    if (clave?.startsWith("dashboard-cache-")) {
+      sessionStorage.removeItem(clave);
+    }
+  }
+}
+
 type TipoImportacion =
   | "pedidosya_csv"
   | "pedidosya_sabores_csv"
@@ -829,6 +838,7 @@ export function ImportacionesPage() {
           sucursal_id: sucursalId,
         });
 
+        invalidarCacheDashboard();
         await cargarRentabilidad();
 
         setMensaje(
@@ -952,6 +962,8 @@ export function ImportacionesPage() {
         periodo_id: periodoId,
         sucursal_id: sucursalId,
       });
+
+    invalidarCacheDashboard();
 
     setMensaje(
       `Análisis recalculado. Paradise: ${resultado.productos_paradise}. ` +

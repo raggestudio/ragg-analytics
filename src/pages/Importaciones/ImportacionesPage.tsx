@@ -823,7 +823,18 @@ export function ImportacionesPage() {
           productos: resultado.productos,
         });
 
-        setMensaje(`PDF Isatech importado: ${resultado.productos.length} productos.`);
+        const rentabilidadActualizada = await calcularRentabilidadPeriodo({
+          empresa_id: empresaId,
+          periodo_id: periodo.id,
+          sucursal_id: sucursalId,
+        });
+
+        await cargarRentabilidad();
+
+        setMensaje(
+          `PDF Isatech importado: ${resultado.productos.length} productos. ` +
+            `Dashboard actualizado: ${rentabilidadActualizada.productos} productos analizados.`
+        );
       }
 
       if (tipoImportacion === "paradise_pdf") {

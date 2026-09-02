@@ -30,6 +30,7 @@ export type SaborPedidosYa = {
 
 function claveCanonicaSabor(sabor: string) {
   const normalizado = String(sabor || "")
+    .replace(/diet(?:\uFFFD|\?)+tica/gi, "Dietética")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -41,6 +42,10 @@ function claveCanonicaSabor(sabor: string) {
     normalizado === "frutilla natural dietetica"
   ) {
     return "frutilla dietetica";
+  }
+
+  if (normalizado === "crema dulcelate dietetica") {
+    return "crema dulcelate dietetica";
   }
 
   return normalizado;
@@ -173,6 +178,8 @@ export function agruparSaboresPedidosYa(
         sabor:
           clave === "frutilla dietetica"
             ? "Frutilla Dietética"
+            : clave === "crema dulcelate dietetica"
+              ? "Crema Dulcelate Dietética"
             : fila.sabor,
         sabor_normalizado: clave,
         cantidad: Number(fila.cantidad || 0),

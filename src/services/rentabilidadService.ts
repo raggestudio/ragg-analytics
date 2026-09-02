@@ -46,6 +46,12 @@ function normalizar(texto: string) {
     .trim();
 }
 
+function corregirNombreIsatech(texto: string) {
+  return String(texto || "")
+    .replace(/diet(?:\uFFFD|\?)+tica/gi, "Dietética")
+    .trim();
+}
+
 function palabras(texto: string) {
   return normalizar(texto)
     .split(" ")
@@ -927,9 +933,15 @@ async function cargarProductosParadise(
   const agrupados = new Map<string, any>();
 
   for (const producto of data || []) {
-    const clave =
-      String(producto.codigo_producto || "").trim() ||
-      normalizar(producto.nombre_producto);
+    const nombreCorregido = corregirNombreIsatech(
+      producto.nombre_producto
+    );
+    const nombreNormalizado = normalizar(nombreCorregido);
+    const esCremaDulcelateDietetica =
+      nombreNormalizado === "crema dulcelate dietetica";
+    const clave = esCremaDulcelateDietetica
+      ? `nombre:${nombreNormalizado}`
+      : String(producto.codigo_producto || "").trim() || nombreNormalizado;
     const existente = agrupados.get(clave);
 
     if (existente) {
@@ -954,6 +966,7 @@ async function cargarProductosParadise(
 
       agrupados.set(clave, {
         ...producto,
+        nombre_producto: nombreCorregido,
         cantidad: Number(producto.cantidad || 0),
         ventas: ventasProducto,
         total: ventasProducto,

@@ -32,8 +32,15 @@ export type ResumenCostosSaboresPedidosYa = {
   sabores_totales: number;
 };
 
+function corregirTextoDanado(texto: string) {
+  return String(texto || "").replace(
+    /diet(?:\uFFFD|\?)+tica/gi,
+    "Dietética"
+  );
+}
+
 function normalizar(texto: string) {
-  return String(texto || "")
+  return corregirTextoDanado(texto)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -48,7 +55,7 @@ function normalizar(texto: string) {
 }
 
 function normalizarConTipo(texto: string) {
-  return String(texto || "")
+  return corregirTextoDanado(texto)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

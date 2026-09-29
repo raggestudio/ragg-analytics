@@ -73,6 +73,7 @@ const aliasRecetasExactos: Record<string, string> = {
 const aliasRecetas: Record<string, string> = {
   "limon natural": "limon",
   limon: "limon",
+  "frutilla natural": "frutilla",
   "crema dulcelate": "dulce late",
   "crema con crocante de coco vegano": "crema vegana con crocante de coco",
   "durazno naranja": "durazno con naranja",
@@ -163,9 +164,7 @@ for (const sabor of saboresBase) {
   const clave =
     nombreNormalizado === "limon natural"
       ? "limon"
-      : nombreNormalizado === "frutilla natural"
-        ? "frutilla"
-        : nombreNormalizado;
+      : nombreNormalizado;
 
   const existente = saboresUnificados.get(clave);
 
@@ -179,9 +178,7 @@ for (const sabor of saboresBase) {
       sabor:
         clave === "limon"
           ? "Limón"
-          : clave === "frutilla"
-            ? "Frutilla Dietética"
-            : sabor.sabor,
+          : sabor.sabor,
       sabor_normalizado: clave,
       cantidad: Number(sabor.cantidad || 0),
     });
@@ -261,22 +258,3 @@ const saboresAgrupados: SaborPedidosYa[] =
     0
   );
 
-  const costoPromedioKg =
-    seleccionesConCosto > 0
-      ? costoPonderado / seleccionesConCosto
-      : 0;
-
-  const ordenadosPorCosto = [...saboresConCosto].sort(
-    (a, b) => Number(a.costo_kg) - Number(b.costo_kg)
-  );
-
-  return {
-    sabores: sabores.sort((a, b) => b.selecciones - a.selecciones),
-    costo_promedio_kg: costoPromedioKg,
-    sabor_mas_barato: ordenadosPorCosto[0] || null,
-    sabor_mas_caro:
-      ordenadosPorCosto[ordenadosPorCosto.length - 1] || null,
-    sabores_vinculados: saboresConCosto.length,
-    sabores_totales: sabores.length,
-  };
-}

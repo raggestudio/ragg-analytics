@@ -258,3 +258,22 @@ const saboresAgrupados: SaborPedidosYa[] =
     0
   );
 
+  const costoPromedioKg =
+    seleccionesConCosto > 0
+      ? costoPonderado / seleccionesConCosto
+      : 0;
+
+  const ordenadosPorCosto = [...saboresConCosto].sort(
+    (a, b) => Number(a.costo_kg) - Number(b.costo_kg)
+  );
+
+  return {
+    sabores: sabores.sort((a, b) => b.selecciones - a.selecciones),
+    costo_promedio_kg: costoPromedioKg,
+    sabor_mas_barato: ordenadosPorCosto[0] || null,
+    sabor_mas_caro:
+      ordenadosPorCosto[ordenadosPorCosto.length - 1] || null,
+    sabores_vinculados: saboresConCosto.length,
+    sabores_totales: sabores.length,
+  };
+}

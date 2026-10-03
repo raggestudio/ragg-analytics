@@ -1074,60 +1074,163 @@ function textoComparacion() {
     <>
       <Metric
         title="Facturación PedidosYa"
-        value={moneda(
-          resumen.ventas_pedidosya
+        value={moneda(resumen.ventas_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.ventas_pedidosya,
+            anterior?.ventas_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.ventas_pedidosya,
+            anterior?.ventas_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Pedidos"
         value={resumen.pedidos_pedidosya}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.pedidos_pedidosya,
+            anterior?.pedidos_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.pedidos_pedidosya,
+            anterior?.pedidos_pedidosya
+          )
+        )}
       />
 
       <Metric
         title="Ticket promedio"
-        value={moneda(
-          resumen.ticket_pedidosya
+        value={moneda(resumen.ticket_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.ticket_pedidosya,
+            anterior?.ticket_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.ticket_pedidosya,
+            anterior?.ticket_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Delivery"
-        value={moneda(
-          resumen.delivery_pedidosya
+        value={moneda(resumen.delivery_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.delivery_pedidosya,
+            anterior?.delivery_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.delivery_pedidosya,
+            anterior?.delivery_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Pickup"
-        value={moneda(
-          resumen.pickup_pedidosya
+        value={moneda(resumen.pickup_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.pickup_pedidosya,
+            anterior?.pickup_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.pickup_pedidosya,
+            anterior?.pickup_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Participación"
-        value={porcentaje(
-          resumen.participacion_pedidosya
+        value={porcentaje(resumen.participacion_pedidosya)}
+        variation={textoVariacion(
+          variacionPuntos(
+            resumen.participacion_pedidosya,
+            anterior?.participacion_pedidosya
+          ),
+          "puntos"
+        )}
+        variationColor={colorVariacion(
+          variacionPuntos(
+            resumen.participacion_pedidosya,
+            anterior?.participacion_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Costo de productos según Isatech"
-        value={moneda(
-          resumen.costo_productos_pedidosya
+        value={moneda(resumen.costo_productos_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.costo_productos_pedidosya,
+            anterior?.costo_productos_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.costo_productos_pedidosya,
+            anterior?.costo_productos_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Ganancia neta PedidosYa"
         value={moneda(resumen.margen_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.margen_pedidosya,
+            anterior?.margen_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.margen_pedidosya,
+            anterior?.margen_pedidosya
+          )
+        )}
       />
 
       <Metric
         title="Margen PedidosYa"
-        value={porcentaje(
-          resumen.margen_porcentaje_pedidosya
+        value={porcentaje(resumen.margen_porcentaje_pedidosya)}
+        variation={textoVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_pedidosya,
+            anterior?.margen_porcentaje_pedidosya
+          ),
+          "puntos"
+        )}
+        variationColor={colorVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_pedidosya,
+            anterior?.margen_porcentaje_pedidosya
+          )
         )}
       />
     </>
@@ -1407,46 +1510,151 @@ function textoComparacion() {
       <Metric
         title="Facturación en el local"
         value={moneda(resumen.ventas_directas)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.ventas_directas,
+            anterior?.ventas_directas
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.ventas_directas,
+            anterior?.ventas_directas
+          )
+        )}
       />
       <Metric
         title="Unidades vendidas"
-        value={Number(
-          resumen.unidades_local || 0
-        ).toLocaleString("es-UY")}
+        value={Number(resumen.unidades_local || 0).toLocaleString("es-UY")}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.unidades_local,
+            anterior?.unidades_local
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.unidades_local,
+            anterior?.unidades_local
+          )
+        )}
       />
       <Metric
         title="Precio promedio por unidad"
         value={moneda(
           resumen.unidades_local > 0
-            ? resumen.ventas_directas /
-                resumen.unidades_local
+            ? resumen.ventas_directas / resumen.unidades_local
             : 0
+        )}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.unidades_local > 0
+              ? resumen.ventas_directas / resumen.unidades_local
+              : 0,
+            anterior && anterior.unidades_local > 0
+              ? anterior.ventas_directas / anterior.unidades_local
+              : null
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.unidades_local > 0
+              ? resumen.ventas_directas / resumen.unidades_local
+              : 0,
+            anterior && anterior.unidades_local > 0
+              ? anterior.ventas_directas / anterior.unidades_local
+              : null
+          )
         )}
       />
       <Metric
         title="Ventas manuales"
         value={moneda(resumen.ventas_manuales || 0)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.ventas_manuales || 0,
+            anterior?.ventas_manuales
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.ventas_manuales || 0,
+            anterior?.ventas_manuales
+          )
+        )}
       />
       <Metric
         title="Kilos vendidos manualmente"
         value={Number(
           resumen.kilos_ventas_manuales || 0
         ).toLocaleString("es-UY")}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.kilos_ventas_manuales || 0,
+            anterior?.kilos_ventas_manuales
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.kilos_ventas_manuales || 0,
+            anterior?.kilos_ventas_manuales
+          )
+        )}
       />
       <Metric
         title="Costo de productos"
-        value={moneda(
-          resumen.costo_productos_local
+        value={moneda(resumen.costo_productos_local)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.costo_productos_local,
+            anterior?.costo_productos_local
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.costo_productos_local,
+            anterior?.costo_productos_local
+          )
         )}
       />
       <Metric
         title="Ganancia del local"
         value={moneda(resumen.margen_local)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.margen_local,
+            anterior?.margen_local
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.margen_local,
+            anterior?.margen_local
+          )
+        )}
       />
       <Metric
         title="Margen del local"
-        value={porcentaje(
-          resumen.margen_porcentaje_local
+        value={porcentaje(resumen.margen_porcentaje_local)}
+        variation={textoVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_local,
+            anterior?.margen_porcentaje_local
+          ),
+          "puntos"
+        )}
+        variationColor={colorVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_local,
+            anterior?.margen_porcentaje_local
+          )
         )}
       />
     </div>
@@ -1495,6 +1703,19 @@ function textoComparacion() {
               <Metric
                 title={resumen.es_restaurante ? "Facturación total" : "Total Isatech"}
                 value={moneda(resumen.ventas_totales)}
+                variation={textoVariacion(
+                  variacionPorcentual(
+                    resumen.ventas_totales,
+                    anterior?.ventas_totales
+                  ),
+                  "porcentaje"
+                )}
+                variationColor={colorVariacion(
+                  variacionPorcentual(
+                    resumen.ventas_totales,
+                    anterior?.ventas_totales
+                  )
+                )}
               />
 
               {resumen.es_restaurante ? (
@@ -1539,15 +1760,73 @@ function textoComparacion() {
                 </>
               ) : (
                 <>
-                  <Metric title="PedidoYa" value={moneda(resumen.ventas_pedidosya)} />
-                  <Metric title="Ventas directas" value={moneda(resumen.ventas_directas)} />
+                  <Metric
+                    title="PedidoYa"
+                    value={moneda(resumen.ventas_pedidosya)}
+                    variation={textoVariacion(
+                      variacionPorcentual(
+                        resumen.ventas_pedidosya,
+                        anterior?.ventas_pedidosya
+                      ),
+                      "porcentaje"
+                    )}
+                    variationColor={colorVariacion(
+                      variacionPorcentual(
+                        resumen.ventas_pedidosya,
+                        anterior?.ventas_pedidosya
+                      )
+                    )}
+                  />
+                  <Metric
+                    title="Ventas directas"
+                    value={moneda(resumen.ventas_directas)}
+                    variation={textoVariacion(
+                      variacionPorcentual(
+                        resumen.ventas_directas,
+                        anterior?.ventas_directas
+                      ),
+                      "porcentaje"
+                    )}
+                    variationColor={colorVariacion(
+                      variacionPorcentual(
+                        resumen.ventas_directas,
+                        anterior?.ventas_directas
+                      )
+                    )}
+                  />
                   <Metric
                     title="% PedidoYa"
                     value={porcentaje(resumen.participacion_pedidosya)}
+                    variation={textoVariacion(
+                      variacionPuntos(
+                        resumen.participacion_pedidosya,
+                        anterior?.participacion_pedidosya
+                      ),
+                      "puntos"
+                    )}
+                    variationColor={colorVariacion(
+                      variacionPuntos(
+                        resumen.participacion_pedidosya,
+                        anterior?.participacion_pedidosya
+                      )
+                    )}
                   />
                   <Metric
                     title="% Ventas directas"
                     value={porcentaje(resumen.participacion_directas)}
+                    variation={textoVariacion(
+                      variacionPuntos(
+                        resumen.participacion_directas,
+                        anterior?.participacion_directas
+                      ),
+                      "puntos"
+                    )}
+                    variationColor={colorVariacion(
+                      variacionPuntos(
+                        resumen.participacion_directas,
+                        anterior?.participacion_directas
+                      )
+                    )}
                   />
                 </>
               )}

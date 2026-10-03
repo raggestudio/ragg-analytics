@@ -49,6 +49,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
   const [productosSinCosto, setProductosSinCosto] = useState<Set<string>>(
     new Set()
   );
+  const [costosSugeridos, setCostosSugeridos] = useState<
+    Record<string, number>
+  >({});
 
   useEffect(() => {
     cargarDatos();
@@ -62,6 +65,7 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       const [
         ventasResultado,
         rentabilidadSinCostoResultado,
+        rentabilidadConCostoResultado,
         recetasData,
         reglas,
         vinculaciones,
@@ -76,6 +80,12 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
             .select("nombre_producto, categoria, cantidad, ventas")
             .eq("empresa_id", empresaId)
             .eq("tipo_calculo", "sin_costo"),
+          supabase
+            .from("rentabilidad_periodo")
+            .select("nombre_producto, costo_unitario")
+            .eq("empresa_id", empresaId)
+            .neq("tipo_calculo", "sin_costo")
+            .gt("costo_unitario", 0),
           obtenerRecetasPorEmpresa(empresaId),
           obtenerReglasCosto(empresaId),
           obtenerVinculaciones(empresaId),
@@ -84,6 +94,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       if (ventasResultado.error) throw ventasResultado.error;
       if (rentabilidadSinCostoResultado.error) {
         throw rentabilidadSinCostoResultado.error;
+      }
+      if (rentabilidadConCostoResultado.error) {
+        throw rentabilidadConCostoResultado.error;
       }
 
       const agrupados = new Map<string, ProductoIsatech>();
@@ -147,9 +160,19 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       setProductos(
         Array.from(agrupados.values()).sort((a, b) => b.ventas - a.ventas)
       );
+      const sugeridos: Record<string, number> = {};
+      for (const fila of rentabilidadConCostoResultado.data || []) {
+        const clave = normalizar(fila.nombre_producto);
+        const costo = Number(fila.costo_unitario || 0);
+        if (costo > 0 && !sugeridos[clave]) {
+          sugeridos[clave] = costo;
+        }
+      }
+
       setRecetas(recetasData);
       setEdiciones(iniciales);
       setProductosSinCosto(pendientesReales);
+      setCostosSugeridos(sugeridos);
     } catch (error: any) {
       setMensaje(error?.message || "No se pudieron cargar las vinculaciones.");
     } finally {
@@ -165,6 +188,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
     if (!edicion) return false;
     if (edicion.tipo_calculo === "receta") return Boolean(edicion.receta_id);
     if (edicion.tipo_calculo === "promedio") return true;
+    if (edicion.tipo_calculo === "fijo") {
+      return Number(edicion.factor || 0) > 0;
+    }
 
     if (edicion.tipo_calculo === "estimado") {
       return producto.ganancia > 0 && producto.ventas >= producto.ganancia;
@@ -202,6 +228,12 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
     if (!edicion) return;
     if (edicion.tipo_calculo === "receta" && !edicion.receta_id) {
       return alert("Seleccioná una receta.");
+    }
+    if (
+      edicion.tipo_calculo === "fijo" &&
+      Number(edicion.factor || 0) <= 0
+    ) {
+      return alert("Ingresá un costo fijo por unidad mayor a cero.");
     }
     if (
       edicion.tipo_calculo === "estimado" &&
@@ -303,8 +335,25 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                     productosSinCosto.has(clave)) && (
                     <small style={alertaCosto}>
                       Isatech no informó una ganancia utilizable. Elegí una
-                      receta o el costo promedio.
+                      receta, el costo promedio o un costo fijo por unidad.
                     </small>
+                  )}
+
+                {productosSinCosto.has(clave) &&
+                  Number(costosSugeridos[clave] || 0) > 0 && (
+                    <button
+                      type="button"
+                      style={suggestionButton}
+                      onClick={() =>
+                        actualizar(clave, {
+                          tipo_calculo: "fijo",
+                          factor: String(costosSugeridos[clave]),
+                        })
+                      }
+                    >
+                      Usar costo detectado en otra sucursal: $
+                      {Number(costosSugeridos[clave]).toLocaleString("es-UY")}
+                    </button>
                   )}
 
                 <select
@@ -318,6 +367,7 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                 >
                   <option value="receta">Receta específica</option>
                   <option value="promedio">Costo promedio de producción</option>
+                  <option value="fijo">Costo fijo por unidad</option>
                   <option value="estimado">
                     Costo informado por Isatech (predeterminado)
                   </option>
@@ -340,7 +390,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                   <span style={ayuda}>
                     {edicion.tipo_calculo === "promedio"
                       ? "Usa el costo promedio por kg producido."
-                      : "Usa el costo calculado por Isatech: venta menos ganancia."}
+                      : edicion.tipo_calculo === "fijo"
+                        ? "Ingresá en el campo siguiente el costo de una unidad."
+                        : "Usa el costo calculado por Isatech: venta menos ganancia."}
                   </span>
                 )}
 
@@ -350,7 +402,16 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                   step="0.01"
                   value={edicion.factor}
                   onChange={(e) => actualizar(clave, { factor: e.target.value })}
-                  title="Factor aplicado al costo"
+                  placeholder={
+                    edicion.tipo_calculo === "fijo"
+                      ? "Costo por unidad"
+                      : "Factor"
+                  }
+                  title={
+                    edicion.tipo_calculo === "fijo"
+                      ? "Costo fijo por unidad"
+                      : "Factor aplicado al costo"
+                  }
                 />
 
                 <button
@@ -385,5 +446,16 @@ const alertaCosto: React.CSSProperties = {
   color: "#fbbf24",
   fontSize: 12,
   gridColumn: "1 / -1",
+};
+const suggestionButton: React.CSSProperties = {
+  gridColumn: "1 / -1",
+  justifySelf: "start",
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "1px solid #60a5fa",
+  background: "#172554",
+  color: "#bfdbfe",
+  cursor: "pointer",
+  fontWeight: 700,
 };
 const button: React.CSSProperties = { padding: 10, borderRadius: 8, cursor: "pointer", background: "#2563eb", color: "white", border: 0 };

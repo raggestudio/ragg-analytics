@@ -309,6 +309,18 @@ function calcularCostoProducto(input: {
     tieneCosto = true;
   }
 
+  if (!tieneCosto && tipoCalculo === "fijo") {
+    costoUnitario = Number(regla?.factor || 0);
+
+    if (costoUnitario > 0) {
+      costoTotal = costoUnitario * cantidad;
+      origenCosto = "costo_fijo_unidad";
+      detalleCosto =
+        `Costo fijo por unidad: ${costoUnitario.toFixed(2)}`;
+      tieneCosto = true;
+    }
+  }
+
   if (!tieneCosto && tipoCalculo === "receta") {
     const receta = regla?.receta_id
       ? contexto.recetasPorId.get(regla.receta_id)

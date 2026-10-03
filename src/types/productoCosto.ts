@@ -1,4 +1,8 @@
-export type TipoCalculoCosto = "receta" | "promedio" | "estimado";
+export type TipoCalculoCosto =
+  | "receta"
+  | "promedio"
+  | "estimado"
+  | "fijo";
 
 export type ProductoCosto = {
   id: string;

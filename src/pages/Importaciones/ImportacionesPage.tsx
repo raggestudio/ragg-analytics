@@ -64,6 +64,14 @@ import {
 } from "../../services/conciliacionPiuService";
 import { parsearFilasReOrder } from "../../services/reOrderParser";
 import { reemplazarVentasReOrder } from "../../services/reOrderService";
+import {
+  eliminarVentaManualPiu,
+  obtenerRecetasVentaManualPiu,
+  obtenerVentasManualesPiu,
+  registrarVentaManualPiu,
+  type RecetaVentaManualPiu,
+  type VentaManualPiu,
+} from "../../services/ventaManualPiuService";
 
 const BERLIN_EMPRESA_ID = "5b66d548-cf91-4262-8e65-2cfd70e9a148";
 
@@ -194,6 +202,14 @@ export function ImportacionesPage() {
   const [conciliacionPiu, setConciliacionPiu] =
     useState<ConciliacionPiu | null>(null);
   const [cargandoConciliacion, setCargandoConciliacion] = useState(false);
+  const [recetasVentaManual, setRecetasVentaManual] =
+    useState<RecetaVentaManualPiu[]>([]);
+  const [ventasManualesPiu, setVentasManualesPiu] =
+    useState<VentaManualPiu[]>([]);
+  const [recetaVentaManualId, setRecetaVentaManualId] = useState("");
+  const [kilosVentaManual, setKilosVentaManual] = useState("15");
+  const [precioKgVentaManual, setPrecioKgVentaManual] = useState("350");
+  const [guardandoVentaManual, setGuardandoVentaManual] = useState(false);
   const calculandoRef = useRef(false);
 
   useEffect(() => {
@@ -245,6 +261,22 @@ export function ImportacionesPage() {
   useEffect(() => {
     void cargarConciliacionPiu();
   }, [empresaId, periodoId, sucursalId, empresas]);
+
+  useEffect(() => {
+    if (!empresaId || !periodoId) return;
+
+    const empresa = empresas.find((item) => item.id === empresaId);
+    if (
+      empresa?.tipo_negocio === "restaurante" ||
+      empresaId === BERLIN_EMPRESA_ID
+    ) {
+      setRecetasVentaManual([]);
+      setVentasManualesPiu([]);
+      return;
+    }
+
+    void cargarDatosVentasManualesPiu();
+  }, [empresaId, periodoId, empresas]);
 
   async function cargarEmpresas() {
     const data = await obtenerEmpresas();
@@ -1028,6 +1060,159 @@ export function ImportacionesPage() {
   }
 }
 
+  async function cargarDatosVentasManualesPiu() {
+    if (!empresaId || !periodoId) return;
+
+    try {
+      const [recetas, ventas] = await Promise.all([
+        obtenerRecetasVentaManualPiu(empresaId),
+        obtenerVentasManualesPiu({
+          empresa_id: empresaId,
+          periodo_id: periodoId,
+        }),
+      ]);
+
+      setRecetasVentaManual(recetas);
+      setVentasManualesPiu(ventas);
+      setRecetaVentaManualId((actual) => {
+        if (recetas.some((receta) => receta.id === actual)) return actual;
+
+        return (
+          recetas.find(
+            (receta) =>
+              receta.nombre
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "") === "americana"
+          )?.id ||
+          recetas[0]?.id ||
+          ""
+        );
+      });
+    } catch (error) {
+      console.error("Error cargando ventas manuales PIÚ:", error);
+    }
+  }
+
+  async function recalcularSucursalesPiu() {
+    await Promise.all(
+      sucursales.map((sucursal) =>
+        calcularRentabilidadPeriodo({
+          empresa_id: empresaId,
+          periodo_id: periodoId,
+          sucursal_id: sucursal.id,
+        })
+      )
+    );
+  }
+
+  async function guardarVentaManualPiu() {
+    const periodo = periodoActual();
+    const receta = recetasVentaManual.find(
+      (item) => item.id === recetaVentaManualId
+    );
+    const kilos = Number(kilosVentaManual.replace(",", "."));
+    const precioKg = Number(precioKgVentaManual.replace(",", "."));
+
+    if (!periodo) {
+      setMensaje("Seleccioná un período.");
+      return;
+    }
+    if (!receta) {
+      setMensaje("Seleccioná la receta del sabor vendido.");
+      return;
+    }
+
+    try {
+      setGuardandoVentaManual(true);
+
+      const resultado = await registrarVentaManualPiu({
+        empresa_id: empresaId,
+        periodo_id: periodo.id,
+        periodo_anio: Number(periodo.anio),
+        periodo_mes: Number(periodo.mes),
+        receta,
+        kilos,
+        precio_kg: precioKg,
+        sucursal_ids: sucursales.map((sucursal) => sucursal.id),
+      });
+
+      await recalcularSucursalesPiu();
+      invalidarCacheDashboard();
+      await cargarDatosVentasManualesPiu();
+      await cargarRentabilidad();
+
+      setMensaje(
+        `Venta manual guardada: ${resultado.kilos_totales.toLocaleString(
+          "es-UY"
+        )} kg de ${receta.nombre} por ${moneda(resultado.venta_total)}. ` +
+          `Se distribuyó en partes iguales entre ${sucursales.length} sucursales.`
+      );
+    } catch (error: any) {
+      console.error(error);
+      setMensaje(error?.message || "No se pudo guardar la venta manual.");
+    } finally {
+      setGuardandoVentaManual(false);
+    }
+  }
+
+  async function borrarVentaManualPiu(codigoGrupo: string) {
+    if (!window.confirm("¿Eliminar esta venta manual del análisis?")) return;
+
+    try {
+      setGuardandoVentaManual(true);
+      await eliminarVentaManualPiu({
+        empresa_id: empresaId,
+        periodo_id: periodoId,
+        codigo_grupo: codigoGrupo,
+      });
+      await recalcularSucursalesPiu();
+      invalidarCacheDashboard();
+      await cargarDatosVentasManualesPiu();
+      await cargarRentabilidad();
+      setMensaje("Venta manual eliminada y análisis actualizado.");
+    } catch (error: any) {
+      console.error(error);
+      setMensaje(error?.message || "No se pudo eliminar la venta manual.");
+    } finally {
+      setGuardandoVentaManual(false);
+    }
+  }
+
+  function agruparVentasManuales() {
+    const grupos = new Map<
+      string,
+      {
+        codigo: string;
+        nombre: string;
+        kilos: number;
+        total: number;
+        sucursales: string[];
+      }
+    >();
+
+    for (const venta of ventasManualesPiu) {
+      const actual = grupos.get(venta.codigo_producto) || {
+        codigo: venta.codigo_producto,
+        nombre: venta.nombre_producto.replace(/^Venta manual · /, ""),
+        kilos: 0,
+        total: 0,
+        sucursales: [],
+      };
+
+      actual.kilos += venta.cantidad;
+      actual.total += venta.total;
+
+      const nombreSucursal =
+        sucursales.find((sucursal) => sucursal.id === venta.sucursal_id)
+          ?.nombre || "Sin sucursal";
+      actual.sucursales.push(nombreSucursal);
+      grupos.set(venta.codigo_producto, actual);
+    }
+
+    return Array.from(grupos.values());
+  }
+
   return (
     <div style={page}>
       <h2>Importaciones</h2>
@@ -1111,6 +1296,114 @@ export function ImportacionesPage() {
 
         {mensaje && <p>{mensaje}</p>}
       </section>
+
+      {!esBerlin() && !esRestaurante() && (
+        <section style={card}>
+          <h3>Ventas manuales de PIÚ</h3>
+          <p style={hint}>
+            Para ventas realizadas fuera de Isatech y PedidosYa. El importe y
+            los kilos se distribuyen en partes iguales entre todas las sucursales,
+            y el costo se toma de la receta elegida.
+          </p>
+
+          <label style={label}>Sabor / receta</label>
+          <select
+            style={input}
+            value={recetaVentaManualId}
+            onChange={(e) => setRecetaVentaManualId(e.target.value)}
+          >
+            {recetasVentaManual.length === 0 ? (
+              <option value="">Sin recetas con costo</option>
+            ) : (
+              recetasVentaManual.map((receta) => (
+                <option key={receta.id} value={receta.id}>
+                  {receta.nombre} · costo {moneda(receta.costo_kg)}/kg
+                </option>
+              ))
+            )}
+          </select>
+
+          <div style={manualGrid}>
+            <div>
+              <label style={label}>Kilos vendidos</label>
+              <input
+                style={input}
+                type="number"
+                min="0"
+                step="0.01"
+                value={kilosVentaManual}
+                onChange={(e) => setKilosVentaManual(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={label}>Precio por kilo</label>
+              <input
+                style={input}
+                type="number"
+                min="0"
+                step="0.01"
+                value={precioKgVentaManual}
+                onChange={(e) => setPrecioKgVentaManual(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <p style={hint}>
+            Total:{" "}
+            <strong>
+              {moneda(
+                Number(kilosVentaManual.replace(",", ".")) *
+                  Number(precioKgVentaManual.replace(",", "."))
+              )}
+            </strong>
+            {" · "}
+            {sucursales.length > 0
+              ? `${(
+                  Number(kilosVentaManual.replace(",", ".")) /
+                  sucursales.length
+                ).toLocaleString("es-UY")} kg y ${moneda(
+                  (Number(kilosVentaManual.replace(",", ".")) *
+                    Number(precioKgVentaManual.replace(",", "."))) /
+                    sucursales.length
+                )} por sucursal`
+              : "No hay sucursales cargadas"}
+          </p>
+
+          <button
+            type="button"
+            style={button}
+            onClick={guardarVentaManualPiu}
+            disabled={guardandoVentaManual || !recetaVentaManualId}
+          >
+            {guardandoVentaManual ? "Guardando..." : "Agregar venta manual"}
+          </button>
+
+          {agruparVentasManuales().length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <h4>Ventas manuales cargadas en el período</h4>
+              {agruparVentasManuales().map((venta) => (
+                <div key={venta.codigo} style={ventaManualItem}>
+                  <div>
+                    <strong>{venta.nombre}</strong>
+                    <span>
+                      {venta.kilos.toLocaleString("es-UY")} kg ·{" "}
+                      {moneda(venta.total)} · {venta.sucursales.join(" / ")}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    style={deleteButton}
+                    onClick={() => borrarVentaManualPiu(venta.codigo)}
+                    disabled={guardandoVentaManual}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <section style={card}>
         <h3>Estado del período</h3>
@@ -1436,6 +1729,33 @@ const button: React.CSSProperties = {
   padding: "12px 18px",
   borderRadius: 8,
   border: "none",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const manualGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 16,
+  maxWidth: 720,
+};
+
+const ventaManualItem: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 16,
+  padding: "14px 0",
+  borderBottom: "1px solid #334155",
+};
+
+const deleteButton: React.CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "1px solid #ef4444",
+  background: "transparent",
+  color: "#fca5a5",
   cursor: "pointer",
   fontWeight: 700,
 };

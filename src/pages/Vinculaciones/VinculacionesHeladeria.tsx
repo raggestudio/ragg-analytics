@@ -165,6 +165,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
     if (!edicion) return false;
     if (edicion.tipo_calculo === "receta") return Boolean(edicion.receta_id);
     if (edicion.tipo_calculo === "promedio") return true;
+    if (edicion.tipo_calculo === "fijo") {
+      return Number(edicion.factor || 0) > 0;
+    }
 
     if (edicion.tipo_calculo === "estimado") {
       return producto.ganancia > 0 && producto.ventas >= producto.ganancia;
@@ -202,6 +205,12 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
     if (!edicion) return;
     if (edicion.tipo_calculo === "receta" && !edicion.receta_id) {
       return alert("Seleccioná una receta.");
+    }
+    if (
+      edicion.tipo_calculo === "fijo" &&
+      Number(edicion.factor || 0) <= 0
+    ) {
+      return alert("Ingresá un costo fijo por unidad mayor a cero.");
     }
     if (
       edicion.tipo_calculo === "estimado" &&
@@ -303,7 +312,7 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                     productosSinCosto.has(clave)) && (
                     <small style={alertaCosto}>
                       Isatech no informó una ganancia utilizable. Elegí una
-                      receta o el costo promedio.
+                      receta, el costo promedio o un costo fijo por unidad.
                     </small>
                   )}
 
@@ -318,6 +327,7 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                 >
                   <option value="receta">Receta específica</option>
                   <option value="promedio">Costo promedio de producción</option>
+                  <option value="fijo">Costo fijo por unidad</option>
                   <option value="estimado">
                     Costo informado por Isatech (predeterminado)
                   </option>
@@ -340,7 +350,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                   <span style={ayuda}>
                     {edicion.tipo_calculo === "promedio"
                       ? "Usa el costo promedio por kg producido."
-                      : "Usa el costo calculado por Isatech: venta menos ganancia."}
+                      : edicion.tipo_calculo === "fijo"
+                        ? "Ingresá en el campo siguiente el costo de una unidad."
+                        : "Usa el costo calculado por Isatech: venta menos ganancia."}
                   </span>
                 )}
 
@@ -350,7 +362,16 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                   step="0.01"
                   value={edicion.factor}
                   onChange={(e) => actualizar(clave, { factor: e.target.value })}
-                  title="Factor aplicado al costo"
+                  placeholder={
+                    edicion.tipo_calculo === "fijo"
+                      ? "Costo por unidad"
+                      : "Factor"
+                  }
+                  title={
+                    edicion.tipo_calculo === "fijo"
+                      ? "Costo fijo por unidad"
+                      : "Factor aplicado al costo"
+                  }
                 />
 
                 <button

@@ -49,6 +49,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
   const [productosSinCosto, setProductosSinCosto] = useState<Set<string>>(
     new Set()
   );
+  const [costosSugeridos, setCostosSugeridos] = useState<
+    Record<string, number>
+  >({});
 
   useEffect(() => {
     cargarDatos();
@@ -62,6 +65,7 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       const [
         ventasResultado,
         rentabilidadSinCostoResultado,
+        rentabilidadConCostoResultado,
         recetasData,
         reglas,
         vinculaciones,
@@ -76,6 +80,12 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
             .select("nombre_producto, categoria, cantidad, ventas")
             .eq("empresa_id", empresaId)
             .eq("tipo_calculo", "sin_costo"),
+          supabase
+            .from("rentabilidad_periodo")
+            .select("nombre_producto, costo_unitario")
+            .eq("empresa_id", empresaId)
+            .neq("tipo_calculo", "sin_costo")
+            .gt("costo_unitario", 0),
           obtenerRecetasPorEmpresa(empresaId),
           obtenerReglasCosto(empresaId),
           obtenerVinculaciones(empresaId),
@@ -84,6 +94,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       if (ventasResultado.error) throw ventasResultado.error;
       if (rentabilidadSinCostoResultado.error) {
         throw rentabilidadSinCostoResultado.error;
+      }
+      if (rentabilidadConCostoResultado.error) {
+        throw rentabilidadConCostoResultado.error;
       }
 
       const agrupados = new Map<string, ProductoIsatech>();
@@ -147,9 +160,19 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       setProductos(
         Array.from(agrupados.values()).sort((a, b) => b.ventas - a.ventas)
       );
+      const sugeridos: Record<string, number> = {};
+      for (const fila of rentabilidadConCostoResultado.data || []) {
+        const clave = normalizar(fila.nombre_producto);
+        const costo = Number(fila.costo_unitario || 0);
+        if (costo > 0 && !sugeridos[clave]) {
+          sugeridos[clave] = costo;
+        }
+      }
+
       setRecetas(recetasData);
       setEdiciones(iniciales);
       setProductosSinCosto(pendientesReales);
+      setCostosSugeridos(sugeridos);
     } catch (error: any) {
       setMensaje(error?.message || "No se pudieron cargar las vinculaciones.");
     } finally {
@@ -316,6 +339,23 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                     </small>
                   )}
 
+                {productosSinCosto.has(clave) &&
+                  Number(costosSugeridos[clave] || 0) > 0 && (
+                    <button
+                      type="button"
+                      style={suggestionButton}
+                      onClick={() =>
+                        actualizar(clave, {
+                          tipo_calculo: "fijo",
+                          factor: String(costosSugeridos[clave]),
+                        })
+                      }
+                    >
+                      Usar costo detectado en otra sucursal: $
+                      {Number(costosSugeridos[clave]).toLocaleString("es-UY")}
+                    </button>
+                  )}
+
                 <select
                   style={control}
                   value={edicion.tipo_calculo}
@@ -406,5 +446,16 @@ const alertaCosto: React.CSSProperties = {
   color: "#fbbf24",
   fontSize: 12,
   gridColumn: "1 / -1",
+};
+const suggestionButton: React.CSSProperties = {
+  gridColumn: "1 / -1",
+  justifySelf: "start",
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "1px solid #60a5fa",
+  background: "#172554",
+  color: "#bfdbfe",
+  cursor: "pointer",
+  fontWeight: 700,
 };
 const button: React.CSSProperties = { padding: 10, borderRadius: 8, cursor: "pointer", background: "#2563eb", color: "white", border: 0 };

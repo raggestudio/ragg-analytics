@@ -1424,6 +1424,16 @@ function textoComparacion() {
         )}
       />
       <Metric
+        title="Ventas manuales"
+        value={moneda(resumen.ventas_manuales || 0)}
+      />
+      <Metric
+        title="Kilos vendidos manualmente"
+        value={Number(
+          resumen.kilos_ventas_manuales || 0
+        ).toLocaleString("es-UY")}
+      />
+      <Metric
         title="Costo de productos"
         value={moneda(
           resumen.costo_productos_local

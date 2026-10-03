@@ -19,6 +19,8 @@ export type DashboardResumen = {
   pickup_pedidosya: number;
   participacion_pedidosya: number;
   ventas_directas: number;
+  ventas_manuales: number;
+  kilos_ventas_manuales: number;
   participacion_directas: number;
   kilos_producidos: number;
   costo_promedio_kg: number;
@@ -303,6 +305,18 @@ export async function obtenerDashboardResumen(input: {
           )
       )
     : [];
+  const filasVentasManuales = filasIsatechLocal.filter(
+    (item: any) =>
+      normalizar(item.categoria || "").includes("venta manual")
+  );
+  const ventasManuales = filasVentasManuales.reduce(
+    (total: number, item: any) => total + Number(item.ventas || 0),
+    0
+  );
+  const kilosVentasManuales = filasVentasManuales.reduce(
+    (total: number, item: any) => total + Number(item.cantidad || 0),
+    0
+  );
   const comisionPedidosYa = filasPedidosYa.reduce(
   (total: number, item: any) =>
     total + Number(item.comision || 0),
@@ -574,6 +588,8 @@ const costosCanal =
           100
         : 0,
     ventas_directas: ventasDirectas,
+    ventas_manuales: ventasManuales,
+    kilos_ventas_manuales: kilosVentasManuales,
     participacion_directas:
       ventasTotalesAjustadas > 0
         ? (ventasDirectas /
@@ -761,6 +777,14 @@ const ventasBrutasPedidosYa =
   );
 
   const ventasDirectas = Math.max(ventasTotales - ventasPedidosYa, 0);
+  const ventasManuales = resumenes.reduce(
+    (total, item) => total + Number(item.ventas_manuales || 0),
+    0
+  );
+  const kilosVentasManuales = resumenes.reduce(
+    (total, item) => total + Number(item.kilos_ventas_manuales || 0),
+    0
+  );
 
   return {
     ventas_totales: ventasTotales,
@@ -788,6 +812,8 @@ const ventasBrutasPedidosYa =
       ventasTotales > 0 ? (ventasPedidosYa / ventasTotales) * 100 : 0,
 
     ventas_directas: ventasDirectas,
+    ventas_manuales: ventasManuales,
+    kilos_ventas_manuales: kilosVentasManuales,
     participacion_directas:
       ventasTotales > 0 ? (ventasDirectas / ventasTotales) * 100 : 0,
 

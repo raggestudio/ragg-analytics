@@ -28,7 +28,7 @@ function periodo(valor: unknown) {
     jun: 6, junio: 6,
     jul: 7, julio: 7,
     ago: 8, agosto: 8,
-    sep: 9, set: 9, septiembre: 9, setiembre: 9,
+    sep: 9, sept: 9, set: 9, septiembre: 9, setiembre: 9,
     oct: 10, octubre: 10,
     nov: 11, noviembre: 11,
     dic: 12, diciembre: 12,

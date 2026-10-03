@@ -309,11 +309,17 @@ function calcularCostoProducto(input: {
     tieneCosto = true;
   }
 
-  if (!tieneCosto && tipoCalculo === "fijo") {
+  const esCostoFijo =
+    tipoCalculo === "fijo" ||
+    (tipoCalculo === "estimado" &&
+      regla?.observaciones === "costo_fijo_unidad");
+
+  if (!tieneCosto && esCostoFijo) {
     costoUnitario = Number(regla?.factor || 0);
 
     if (costoUnitario > 0) {
       costoTotal = costoUnitario * cantidad;
+      tipoCalculo = "fijo";
       origenCosto = "costo_fijo_unidad";
       detalleCosto =
         `Costo fijo por unidad: ${costoUnitario.toFixed(2)}`;

@@ -251,10 +251,17 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       await guardarReglaCosto({
         empresa_id: empresaId,
         nombre_producto: producto.nombre_producto,
-        tipo_calculo: edicion.tipo_calculo,
+        // La base actual admite "estimado" pero todavía no "fijo".
+        // El marcador permite conservar la semántica de costo fijo sin
+        // depender de una migración de la restricción SQL.
+        tipo_calculo:
+          edicion.tipo_calculo === "fijo" ? "estimado" : edicion.tipo_calculo,
         receta_id: recetaId,
         factor: Number(edicion.factor || 1),
-        observaciones: edicion.observaciones || null,
+        observaciones:
+          edicion.tipo_calculo === "fijo"
+            ? "costo_fijo_unidad"
+            : edicion.observaciones || null,
       });
 
       await guardarVinculacion(

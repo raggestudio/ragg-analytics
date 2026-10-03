@@ -46,6 +46,9 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(false);
   const [guardando, setGuardando] = useState<string | null>(null);
+  const [productosSinCosto, setProductosSinCosto] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     cargarDatos();
@@ -56,19 +59,32 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
     setMensaje("");
 
     try {
-      const [ventasResultado, recetasData, reglas, vinculaciones] =
-        await Promise.all([
+      const [
+        ventasResultado,
+        rentabilidadSinCostoResultado,
+        recetasData,
+        reglas,
+        vinculaciones,
+      ] = await Promise.all([
           supabase
             .from("producto_ventas_resumen")
             .select("nombre_producto, categoria, cantidad, total, ganancia")
             .eq("empresa_id", empresaId)
             .eq("fuente", "Isatech"),
+          supabase
+            .from("rentabilidad_periodo")
+            .select("nombre_producto, categoria, cantidad, ventas")
+            .eq("empresa_id", empresaId)
+            .eq("tipo_calculo", "sin_costo"),
           obtenerRecetasPorEmpresa(empresaId),
           obtenerReglasCosto(empresaId),
           obtenerVinculaciones(empresaId),
         ]);
 
       if (ventasResultado.error) throw ventasResultado.error;
+      if (rentabilidadSinCostoResultado.error) {
+        throw rentabilidadSinCostoResultado.error;
+      }
 
       const agrupados = new Map<string, ProductoIsatech>();
       for (const fila of ventasResultado.data || []) {
@@ -84,6 +100,23 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
             categoria: fila.categoria || null,
             ventas: Number(fila.total || 0),
             ganancia: Number(fila.ganancia || 0),
+            cantidad: Number(fila.cantidad || 0),
+          });
+        }
+      }
+
+      const pendientesReales = new Set<string>();
+
+      for (const fila of rentabilidadSinCostoResultado.data || []) {
+        const clave = normalizar(fila.nombre_producto);
+        pendientesReales.add(clave);
+
+        if (!agrupados.has(clave)) {
+          agrupados.set(clave, {
+            nombre_producto: fila.nombre_producto,
+            categoria: fila.categoria || null,
+            ventas: Number(fila.ventas || 0),
+            ganancia: 0,
             cantidad: Number(fila.cantidad || 0),
           });
         }
@@ -116,6 +149,7 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       );
       setRecetas(recetasData);
       setEdiciones(iniciales);
+      setProductosSinCosto(pendientesReales);
     } catch (error: any) {
       setMensaje(error?.message || "No se pudieron cargar las vinculaciones.");
     } finally {
@@ -124,7 +158,10 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
   }
 
   function estaCompleto(producto: ProductoIsatech) {
-    const edicion = ediciones[normalizar(producto.nombre_producto)];
+    const clave = normalizar(producto.nombre_producto);
+    if (productosSinCosto.has(clave)) return false;
+
+    const edicion = ediciones[clave];
     if (!edicion) return false;
     if (edicion.tipo_calculo === "receta") return Boolean(edicion.receta_id);
     if (edicion.tipo_calculo === "promedio") return true;
@@ -142,7 +179,13 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
       const coincide = normalizar(producto.nombre_producto).includes(texto);
       return coincide && (!soloPendientes || !estaCompleto(producto));
     });
-  }, [productos, busqueda, soloPendientes, ediciones]);
+  }, [
+    productos,
+    busqueda,
+    soloPendientes,
+    ediciones,
+    productosSinCosto,
+  ]);
 
   const pendientes = productos.filter((producto) => !estaCompleto(producto)).length;
 
@@ -159,6 +202,14 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
     if (!edicion) return;
     if (edicion.tipo_calculo === "receta" && !edicion.receta_id) {
       return alert("Seleccioná una receta.");
+    }
+    if (
+      edicion.tipo_calculo === "estimado" &&
+      productosSinCosto.has(clave)
+    ) {
+      return alert(
+        "Isatech no informó un costo utilizable. Elegí una receta o el costo promedio."
+      );
     }
 
     try {
@@ -181,8 +232,14 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
         recetaId
       );
 
-      setMensaje(`Vinculación guardada: ${producto.nombre_producto}.`);
-      await cargarDatos();
+      setMensaje(
+        `Vinculación guardada: ${producto.nombre_producto}. Recalculá el análisis del período para actualizar el dashboard.`
+      );
+      setProductosSinCosto((actual) => {
+        const siguiente = new Set(actual);
+        siguiente.delete(clave);
+        return siguiente;
+      });
     } catch (error: any) {
       setMensaje(error?.message || "No se pudo guardar la vinculación.");
     } finally {

@@ -17,6 +17,7 @@ type ProductoIsatech = {
   nombre_producto: string;
   categoria: string | null;
   ventas: number;
+  ganancia: number;
   cantidad: number;
 };
 
@@ -59,7 +60,7 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
         await Promise.all([
           supabase
             .from("producto_ventas_resumen")
-            .select("nombre_producto, categoria, cantidad, total")
+            .select("nombre_producto, categoria, cantidad, total, ganancia")
             .eq("empresa_id", empresaId)
             .eq("fuente", "Isatech"),
           obtenerRecetasPorEmpresa(empresaId),
@@ -75,12 +76,14 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
         const actual = agrupados.get(clave);
         if (actual) {
           actual.ventas += Number(fila.total || 0);
+          actual.ganancia += Number(fila.ganancia || 0);
           actual.cantidad += Number(fila.cantidad || 0);
         } else {
           agrupados.set(clave, {
             nombre_producto: fila.nombre_producto,
             categoria: fila.categoria || null,
             ventas: Number(fila.total || 0),
+            ganancia: Number(fila.ganancia || 0),
             cantidad: Number(fila.cantidad || 0),
           });
         }
@@ -124,10 +127,13 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
     const edicion = ediciones[normalizar(producto.nombre_producto)];
     if (!edicion) return false;
     if (edicion.tipo_calculo === "receta") return Boolean(edicion.receta_id);
-    return (
-      edicion.tipo_calculo === "promedio" ||
-      edicion.tipo_calculo === "estimado"
-    );
+    if (edicion.tipo_calculo === "promedio") return true;
+
+    if (edicion.tipo_calculo === "estimado") {
+      return producto.ganancia > 0 && producto.ventas >= producto.ganancia;
+    }
+
+    return false;
   }
 
   const productosFiltrados = useMemo(() => {
@@ -235,6 +241,14 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                   </small>
                 </div>
 
+                {edicion.tipo_calculo === "estimado" &&
+                  producto.ganancia <= 0 && (
+                    <small style={alertaCosto}>
+                      Isatech no informó una ganancia utilizable. Elegí una
+                      receta o el costo promedio.
+                    </small>
+                  )}
+
                 <select
                   style={control}
                   value={edicion.tipo_calculo}
@@ -309,4 +323,9 @@ const fila: React.CSSProperties = { display: "grid", gridTemplateColumns: "2fr 1
 const control: React.CSSProperties = { padding: 10, borderRadius: 7, minWidth: 0 };
 const detalle: React.CSSProperties = { display: "block", marginTop: 5, color: "#cbd5e1" };
 const ayuda: React.CSSProperties = { color: "#cbd5e1", fontSize: 13 };
+const alertaCosto: React.CSSProperties = {
+  color: "#fbbf24",
+  fontSize: 12,
+  gridColumn: "1 / -1",
+};
 const button: React.CSSProperties = { padding: 10, borderRadius: 8, cursor: "pointer", background: "#2563eb", color: "white", border: 0 };

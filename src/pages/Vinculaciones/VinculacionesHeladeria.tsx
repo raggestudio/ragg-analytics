@@ -299,7 +299,8 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
                 </div>
 
                 {edicion.tipo_calculo === "estimado" &&
-                  producto.ganancia <= 0 && (
+                  (producto.ganancia <= 0 ||
+                    productosSinCosto.has(clave)) && (
                     <small style={alertaCosto}>
                       Isatech no informó una ganancia utilizable. Elegí una
                       receta o el costo promedio.

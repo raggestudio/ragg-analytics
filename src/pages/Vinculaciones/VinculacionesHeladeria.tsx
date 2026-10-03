@@ -149,12 +149,27 @@ export default function VinculacionesHeladeria({ empresaId }: Props) {
         const vinculacion = vinculacionPorNombre.get(clave);
         const recetaId = regla?.receta_id || vinculacion?.receta_id || "";
 
+        const esCostoFijoGuardado =
+          regla?.tipo_calculo === "estimado" &&
+          regla?.observaciones === "costo_fijo_unidad" &&
+          Number(regla?.factor || 0) > 0;
+
         iniciales[clave] = {
-          tipo_calculo: regla?.tipo_calculo || (recetaId ? "receta" : "estimado"),
+          tipo_calculo: esCostoFijoGuardado
+            ? "fijo"
+            : regla?.tipo_calculo || (recetaId ? "receta" : "estimado"),
           receta_id: recetaId,
           factor: regla?.factor == null ? "1" : String(regla.factor),
-          observaciones: regla?.observaciones || "",
+          observaciones: esCostoFijoGuardado
+            ? ""
+            : regla?.observaciones || "",
         };
+
+        // El análisis anterior puede seguir marcado como sin costo hasta el
+        // próximo recálculo. Una regla fija válida ya resuelve el pendiente.
+        if (esCostoFijoGuardado) {
+          pendientesReales.delete(clave);
+        }
       }
 
       setProductos(

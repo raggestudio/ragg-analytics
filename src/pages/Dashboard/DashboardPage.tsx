@@ -1335,91 +1335,78 @@ function textoComparacion() {
       </div>
 
       <div style={metricGrid}>
-        <Metric
-          title="Facturación"
-          value={moneda(
-            resumenTurnoActual.facturacion
-          )}
-        />
-        <Metric
-          title="Pedidos"
-          value={resumenTurnoActual.pedidos}
-        />
-        <Metric
-          title="Ticket promedio"
-          value={moneda(
-            resumenTurnoActual.ticket_promedio
-          )}
-        />
+        {([
+          ["Facturación", resumenTurnoActual.facturacion, resumenTurnoAnterior?.facturacion],
+          ["Pedidos", resumenTurnoActual.pedidos, resumenTurnoAnterior?.pedidos],
+          ["Ticket promedio", resumenTurnoActual.ticket_promedio, resumenTurnoAnterior?.ticket_promedio],
+        ] as const).map(([title, actual, previo]) => {
+          const variacion = variacionPorcentual(actual, previo);
+          return (
+            <Metric
+              key={title}
+              title={title}
+              value={
+                title === "Pedidos"
+                  ? Number(actual).toLocaleString("es-UY")
+                  : moneda(actual)
+              }
+              variation={textoVariacion(variacion, "porcentaje")}
+              variationColor={colorVariacion(variacion)}
+            />
+          );
+        })}
 
         {resumenTurnoActual.detalle_disponible && (
           <>
-            <Metric
-              title="Venta bruta"
-              value={moneda(
-                resumenTurnoActual.ventas_brutas
-              )}
-            />
-            <Metric
-              title="Descuento de Duna"
-              value={moneda(
-                resumenTurnoActual.descuento_local
-              )}
-            />
-            <Metric
-              title="Venta efectiva"
-              value={moneda(
-                resumenTurnoActual.venta_efectiva
-              )}
-            />
-            <Metric
-              title="Comisión 23% + IVA"
-              value={moneda(
-                resumenTurnoActual.comision +
-                  resumenTurnoActual.iva_comision
-              )}
-            />
-            <Metric
-              title="Tarifa de pago en línea"
-              value={moneda(
-                resumenTurnoActual.tarifa_pago_linea
-              )}
-            />
-            <Metric
-              title="Retención recuperable"
-              value={moneda(
-                resumenTurnoActual.retencion_recuperable
-              )}
-            />
-            <Metric
-              title="Ingreso estimado"
-              value={moneda(
-                resumenTurnoActual.ingreso_estimado
-              )}
-            />
-            <Metric
-              title="Costo de productos"
-              value={moneda(
-                resumenTurnoActual.costo_productos
-              )}
-            />
-            <Metric
-              title="Ganancia neta"
-              value={moneda(
-                resumenTurnoActual.ganancia_neta
-              )}
-            />
+            {([
+              ["Venta bruta", resumenTurnoActual.ventas_brutas, resumenTurnoAnterior?.ventas_brutas],
+              ["Descuento de Duna", resumenTurnoActual.descuento_local, resumenTurnoAnterior?.descuento_local],
+              ["Venta efectiva", resumenTurnoActual.venta_efectiva, resumenTurnoAnterior?.venta_efectiva],
+              [
+                "Comisión 23% + IVA",
+                resumenTurnoActual.comision + resumenTurnoActual.iva_comision,
+                resumenTurnoAnterior
+                  ? resumenTurnoAnterior.comision + resumenTurnoAnterior.iva_comision
+                  : null,
+              ],
+              ["Tarifa de pago en línea", resumenTurnoActual.tarifa_pago_linea, resumenTurnoAnterior?.tarifa_pago_linea],
+              ["Retención recuperable", resumenTurnoActual.retencion_recuperable, resumenTurnoAnterior?.retencion_recuperable],
+              ["Ingreso estimado", resumenTurnoActual.ingreso_estimado, resumenTurnoAnterior?.ingreso_estimado],
+              ["Costo de productos", resumenTurnoActual.costo_productos, resumenTurnoAnterior?.costo_productos],
+              ["Ganancia neta", resumenTurnoActual.ganancia_neta, resumenTurnoAnterior?.ganancia_neta],
+            ] as const).map(([title, actual, previo]) => {
+              const variacion = variacionPorcentual(actual, previo);
+              return (
+                <Metric
+                  key={title}
+                  title={title}
+                  value={moneda(actual)}
+                  variation={textoVariacion(variacion, "porcentaje")}
+                  variationColor={colorVariacion(variacion)}
+                />
+              );
+            })}
+
             <Metric
               title="Margen neto"
-              value={porcentaje(
-                resumenTurnoActual.margen_porcentaje
+              value={porcentaje(resumenTurnoActual.margen_porcentaje)}
+              variation={textoVariacion(
+                variacionPuntos(
+                  resumenTurnoActual.margen_porcentaje,
+                  resumenTurnoAnterior?.margen_porcentaje
+                ),
+                "puntos"
+              )}
+              variationColor={colorVariacion(
+                variacionPuntos(
+                  resumenTurnoActual.margen_porcentaje,
+                  resumenTurnoAnterior?.margen_porcentaje
+                )
               )}
             />
             <Metric
               title="Productos sin costo"
-              value={
-                resumenTurnoActual.productos_sin_costo
-              }
+              value={resumenTurnoActual.productos_sin_costo}
             />
           </>
         )}

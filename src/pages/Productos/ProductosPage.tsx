@@ -154,9 +154,12 @@ console.log("PRODUCTOS - PERIODO", periodoSeleccionadoId);
   if (error) throw error;
   if (fuentesResultado.error) throw fuentesResultado.error;
 
-  const modoRestaurante = (fuentesResultado.data || []).some(
-    (fila: any) => fila.fuente === "Paradise"
-  );
+  const modoRestaurante =
+    empresas.find((empresa) => empresa.id === id)?.tipo_negocio ===
+      "restaurante" ||
+    (fuentesResultado.data || []).some(
+      (fila: any) => fila.fuente === "Paradise"
+    );
   setEsRestaurante(modoRestaurante);
 
   const filas = (filasData || []).map((fila: any) => ({
@@ -182,7 +185,8 @@ console.log("PRODUCTOS - RENTABILIDAD", filas);
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/\s+/g, " ")
-      .trim();
+      .trim()
+      .replace(/^mila\s*pasta$/, "mila pasta");
 
     const categoriaNormalizada = String(
       fila.categoria || ""

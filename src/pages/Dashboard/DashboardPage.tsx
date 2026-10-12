@@ -78,6 +78,8 @@ export function DashboardPage() {
     useState<RankingCanalItem[]>([]);
   const [resumenTurnos, setResumenTurnos] =
     useState<ResumenPedidosYaPorTurno | null>(null);
+  const [resumenTurnosAnterior, setResumenTurnosAnterior] =
+    useState<ResumenPedidosYaPorTurno | null>(null);
   const [vistaTurno, setVistaTurno] =
     useState<VistaTurnoPedidosYa>("total");
   const [insights, setInsights] = useState({
@@ -283,7 +285,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
   forzarActualizacion = false
 ) {
   const claveCache = [
-    "dashboard-cache-v9",
+    "dashboard-cache-v10",
     empresaId,
     periodoId,
     sucursalId || "todas",
@@ -333,6 +335,9 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
           );
           setResumenTurnos(
             cache.resumenTurnos || null
+          );
+          setResumenTurnosAnterior(
+            cache.resumenTurnosAnterior || null
           );
           setInsights(
             cache.insights || {
@@ -391,6 +396,39 @@ const resumenTurnosData =
       })
     : null;
 
+let resumenTurnosAnteriorData: ResumenPedidosYaPorTurno | null = null;
+
+if (
+  empresaSeleccionada?.tipo_negocio === "restaurante" &&
+  modoAnalisis === "mensual"
+) {
+  const periodoActual = periodos.find(
+    (periodo) => periodo.id === periodoId
+  );
+
+  if (periodoActual) {
+    const fechaAnterior = new Date(
+      Number(periodoActual.anio),
+      Number(periodoActual.mes) - 2,
+      1
+    );
+    const periodoAnterior = periodos.find(
+      (periodo) =>
+        Number(periodo.anio) === fechaAnterior.getFullYear() &&
+        Number(periodo.mes) === fechaAnterior.getMonth() + 1
+    );
+
+    if (periodoAnterior) {
+      resumenTurnosAnteriorData =
+        await obtenerResumenPedidosYaPorTurno({
+          empresa_id: empresaId,
+          periodo_ids: [periodoAnterior.id],
+          sucursal_id: sucursalId || null,
+        });
+    }
+  }
+}
+
 const topPedidosYaUnificado =
   resumenTurnosData
     ? resumenTurnosData.total.top_productos.map(
@@ -420,6 +458,7 @@ const costosSabores = await obtenerCostosSaboresPedidosYa({
 setSaboresPedidosYa(sabores);
 setCostosSaboresPedidosYa(costosSabores);
 setResumenTurnos(resumenTurnosData);
+setResumenTurnosAnterior(resumenTurnosAnteriorData);
 
       setComparativo(comparativoData);
       setTopRentabilidad(topRentabilidadData);
@@ -455,6 +494,7 @@ sessionStorage.setItem(
     costosSaboresPedidosYa:
       costosSabores,
     resumenTurnos: resumenTurnosData,
+    resumenTurnosAnterior: resumenTurnosAnteriorData,
     insights: insightsCalculados,
   })
 );
@@ -565,6 +605,8 @@ function textoComparacion() {
   const anterior = comparativo?.anterior || null;
   const resumenTurnoActual =
     resumenTurnos?.[vistaTurno] || null;
+  const resumenTurnoAnterior =
+    resumenTurnosAnterior?.[vistaTurno] || null;
 
   if (empresaActual?.id === BERLIN_EMPRESA_ID) {
     return (
@@ -961,112 +1003,113 @@ function textoComparacion() {
             <div style={metricGrid}>
   {resumen.es_restaurante ? (
     <>
-      <Metric
-        title="Facturación bruta PedidosYa"
-        value={moneda(
-          resumen.ventas_brutas_pedidosya
-        )}
-      />
+      {([
+        ["Facturación bruta PedidosYa", resumen.ventas_brutas_pedidosya, anterior?.ventas_brutas_pedidosya],
+        ["Descuentos financiados por Duna", resumen.descuento_local_pedidosya, anterior?.descuento_local_pedidosya],
+        ["Venta efectiva PedidosYa", resumen.ventas_pedidosya, anterior?.ventas_pedidosya],
+      ] as const).map(([title, actual, previo]) => {
+        const variacion = variacionPorcentual(actual, previo);
+        return (
+          <Metric
+            key={title}
+            title={title}
+            value={moneda(actual)}
+            variation={textoVariacion(variacion, "porcentaje")}
+            variationColor={colorVariacion(variacion)}
+          />
+        );
+      })}
 
       <Metric
-        title="Descuentos financiados por Duna"
-        value={moneda(
-          resumen.descuento_local_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Venta efectiva PedidosYa"
-        value={moneda(
-          resumen.ventas_pedidosya
-        )}
+        title="Pedidos entregados"
+        value={resumen.pedidos_pedidosya}
         variation={textoVariacion(
           variacionPorcentual(
-            resumen.ventas_pedidosya,
-            anterior?.ventas_pedidosya
+            resumen.pedidos_pedidosya,
+            anterior?.pedidos_pedidosya
           ),
           "porcentaje"
         )}
         variationColor={colorVariacion(
           variacionPorcentual(
-            resumen.ventas_pedidosya,
-            anterior?.ventas_pedidosya
+            resumen.pedidos_pedidosya,
+            anterior?.pedidos_pedidosya
           )
         )}
       />
 
       <Metric
-        title="Pedidos entregados"
-        value={resumen.pedidos_pedidosya}
-      />
-
-      <Metric
         title="Ticket efectivo promedio"
-        value={moneda(
-          resumen.ticket_pedidosya
+        value={moneda(resumen.ticket_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.ticket_pedidosya,
+            anterior?.ticket_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.ticket_pedidosya,
+            anterior?.ticket_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Participación"
-        value={porcentaje(
-          resumen.participacion_pedidosya
+        value={porcentaje(resumen.participacion_pedidosya)}
+        variation={textoVariacion(
+          variacionPuntos(
+            resumen.participacion_pedidosya,
+            anterior?.participacion_pedidosya
+          ),
+          "puntos"
+        )}
+        variationColor={colorVariacion(
+          variacionPuntos(
+            resumen.participacion_pedidosya,
+            anterior?.participacion_pedidosya
+          )
         )}
       />
 
-      <Metric
-        title="Comisión PedidosYa 23%"
-        value={moneda(
-          resumen.comision_pedidosya
-        )}
-      />
-
-      <Metric
-        title="IVA de la comisión"
-        value={moneda(
-          resumen.iva_comision_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Comisión 23% + IVA"
-        value={moneda(
-          resumen.comision_mas_iva_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Tarifa de pago en línea"
-        value={moneda(
-          resumen.tarifa_pago_linea_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Retención recuperable"
-        value={moneda(
-          resumen.retencion_recuperable_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Costo de productos"
-        value={moneda(
-          resumen.costo_productos_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Ganancia neta PedidosYa"
-        value={moneda(
-          resumen.margen_pedidosya
-        )}
-      />
+      {([
+        ["Comisión PedidosYa 23%", resumen.comision_pedidosya, anterior?.comision_pedidosya],
+        ["IVA de la comisión", resumen.iva_comision_pedidosya, anterior?.iva_comision_pedidosya],
+        ["Comisión 23% + IVA", resumen.comision_mas_iva_pedidosya, anterior?.comision_mas_iva_pedidosya],
+        ["Tarifa de pago en línea", resumen.tarifa_pago_linea_pedidosya, anterior?.tarifa_pago_linea_pedidosya],
+        ["Retención recuperable", resumen.retencion_recuperable_pedidosya, anterior?.retencion_recuperable_pedidosya],
+        ["Costo de productos", resumen.costo_productos_pedidosya, anterior?.costo_productos_pedidosya],
+        ["Ganancia neta PedidosYa", resumen.margen_pedidosya, anterior?.margen_pedidosya],
+      ] as const).map(([title, actual, previo]) => {
+        const variacion = variacionPorcentual(actual, previo);
+        return (
+          <Metric
+            key={title}
+            title={title}
+            value={moneda(actual)}
+            variation={textoVariacion(variacion, "porcentaje")}
+            variationColor={colorVariacion(variacion)}
+          />
+        );
+      })}
 
       <Metric
         title="Margen neto PedidosYa"
-        value={porcentaje(
-          resumen.margen_porcentaje_pedidosya
+        value={porcentaje(resumen.margen_porcentaje_pedidosya)}
+        variation={textoVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_pedidosya,
+            anterior?.margen_porcentaje_pedidosya
+          ),
+          "puntos"
+        )}
+        variationColor={colorVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_pedidosya,
+            anterior?.margen_porcentaje_pedidosya
+          )
         )}
       />
     </>
@@ -1292,91 +1335,78 @@ function textoComparacion() {
       </div>
 
       <div style={metricGrid}>
-        <Metric
-          title="Facturación"
-          value={moneda(
-            resumenTurnoActual.facturacion
-          )}
-        />
-        <Metric
-          title="Pedidos"
-          value={resumenTurnoActual.pedidos}
-        />
-        <Metric
-          title="Ticket promedio"
-          value={moneda(
-            resumenTurnoActual.ticket_promedio
-          )}
-        />
+        {([
+          ["Facturación", resumenTurnoActual.facturacion, resumenTurnoAnterior?.facturacion],
+          ["Pedidos", resumenTurnoActual.pedidos, resumenTurnoAnterior?.pedidos],
+          ["Ticket promedio", resumenTurnoActual.ticket_promedio, resumenTurnoAnterior?.ticket_promedio],
+        ] as const).map(([title, actual, previo]) => {
+          const variacion = variacionPorcentual(actual, previo);
+          return (
+            <Metric
+              key={title}
+              title={title}
+              value={
+                title === "Pedidos"
+                  ? Number(actual).toLocaleString("es-UY")
+                  : moneda(actual)
+              }
+              variation={textoVariacion(variacion, "porcentaje")}
+              variationColor={colorVariacion(variacion)}
+            />
+          );
+        })}
 
         {resumenTurnoActual.detalle_disponible && (
           <>
-            <Metric
-              title="Venta bruta"
-              value={moneda(
-                resumenTurnoActual.ventas_brutas
-              )}
-            />
-            <Metric
-              title="Descuento de Duna"
-              value={moneda(
-                resumenTurnoActual.descuento_local
-              )}
-            />
-            <Metric
-              title="Venta efectiva"
-              value={moneda(
-                resumenTurnoActual.venta_efectiva
-              )}
-            />
-            <Metric
-              title="Comisión 23% + IVA"
-              value={moneda(
-                resumenTurnoActual.comision +
-                  resumenTurnoActual.iva_comision
-              )}
-            />
-            <Metric
-              title="Tarifa de pago en línea"
-              value={moneda(
-                resumenTurnoActual.tarifa_pago_linea
-              )}
-            />
-            <Metric
-              title="Retención recuperable"
-              value={moneda(
-                resumenTurnoActual.retencion_recuperable
-              )}
-            />
-            <Metric
-              title="Ingreso estimado"
-              value={moneda(
-                resumenTurnoActual.ingreso_estimado
-              )}
-            />
-            <Metric
-              title="Costo de productos"
-              value={moneda(
-                resumenTurnoActual.costo_productos
-              )}
-            />
-            <Metric
-              title="Ganancia neta"
-              value={moneda(
-                resumenTurnoActual.ganancia_neta
-              )}
-            />
+            {([
+              ["Venta bruta", resumenTurnoActual.ventas_brutas, resumenTurnoAnterior?.ventas_brutas],
+              ["Descuento de Duna", resumenTurnoActual.descuento_local, resumenTurnoAnterior?.descuento_local],
+              ["Venta efectiva", resumenTurnoActual.venta_efectiva, resumenTurnoAnterior?.venta_efectiva],
+              [
+                "Comisión 23% + IVA",
+                resumenTurnoActual.comision + resumenTurnoActual.iva_comision,
+                resumenTurnoAnterior
+                  ? resumenTurnoAnterior.comision + resumenTurnoAnterior.iva_comision
+                  : null,
+              ],
+              ["Tarifa de pago en línea", resumenTurnoActual.tarifa_pago_linea, resumenTurnoAnterior?.tarifa_pago_linea],
+              ["Retención recuperable", resumenTurnoActual.retencion_recuperable, resumenTurnoAnterior?.retencion_recuperable],
+              ["Ingreso estimado", resumenTurnoActual.ingreso_estimado, resumenTurnoAnterior?.ingreso_estimado],
+              ["Costo de productos", resumenTurnoActual.costo_productos, resumenTurnoAnterior?.costo_productos],
+              ["Ganancia neta", resumenTurnoActual.ganancia_neta, resumenTurnoAnterior?.ganancia_neta],
+            ] as const).map(([title, actual, previo]) => {
+              const variacion = variacionPorcentual(actual, previo);
+              return (
+                <Metric
+                  key={title}
+                  title={title}
+                  value={moneda(actual)}
+                  variation={textoVariacion(variacion, "porcentaje")}
+                  variationColor={colorVariacion(variacion)}
+                />
+              );
+            })}
+
             <Metric
               title="Margen neto"
-              value={porcentaje(
-                resumenTurnoActual.margen_porcentaje
+              value={porcentaje(resumenTurnoActual.margen_porcentaje)}
+              variation={textoVariacion(
+                variacionPuntos(
+                  resumenTurnoActual.margen_porcentaje,
+                  resumenTurnoAnterior?.margen_porcentaje
+                ),
+                "puntos"
+              )}
+              variationColor={colorVariacion(
+                variacionPuntos(
+                  resumenTurnoActual.margen_porcentaje,
+                  resumenTurnoAnterior?.margen_porcentaje
+                )
               )}
             />
             <Metric
               title="Productos sin costo"
-              value={
-                resumenTurnoActual.productos_sin_costo
-              }
+              value={resumenTurnoActual.productos_sin_costo}
             />
           </>
         )}

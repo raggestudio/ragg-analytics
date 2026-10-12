@@ -57,7 +57,8 @@ function normalizar(texto: unknown) {
     .replace(/\bgin\s+tonic\b/g, "gintonic")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .replace(/^mila\s*pasta$/, "mila pasta");
 }
 
 function nombreProductoBase(texto: unknown) {
@@ -438,6 +439,19 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     );
   }
 
+  let rentabilidadCostosQuery = supabase
+    .from("rentabilidad_periodo")
+    .select("nombre_producto, cantidad, costo_total")
+    .eq("empresa_id", input.empresa_id)
+    .in("periodo_id", input.periodo_ids)
+    .eq("canal", "PedidosYa");
+
+  if (input.sucursal_id) {
+    rentabilidadCostosQuery = rentabilidadCostosQuery.eq(
+      "sucursal_id",
+      input.sucursal_id
+    );
+  }
 
   const [
     { data: ventas, error: ventasError },
@@ -446,6 +460,10 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     resumenProductos,
     { data: costos, error: costosError },
     { data: vinculaciones, error: vinculacionesError },
+    {
+      data: rentabilidadCostos,
+      error: rentabilidadCostosError,
+    },
   ] = await Promise.all([
     ventasQuery,
     cargarPedidosYaPaginados(input),
@@ -466,11 +484,13 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       .eq("empresa_id", input.empresa_id)
       .eq("sistema", "pedidosya")
       .eq("activo", true),
+    rentabilidadCostosQuery,
   ]);
 
   if (ventasError) throw ventasError;
   if (costosError) throw costosError;
   if (vinculacionesError) throw vinculacionesError;
+  if (rentabilidadCostosError) throw rentabilidadCostosError;
 
   const porTurno = {
     mediodia: resumenVacio("mediodia"),
@@ -547,6 +567,32 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
     );
   }
 
+  const costoRentabilidadPorNombre = new Map<
+    string,
+    { cantidad: number; costo: number }
+  >();
+
+  for (const fila of rentabilidadCostos || []) {
+    const clave = normalizar(fila.nombre_producto);
+    const acumulado = costoRentabilidadPorNombre.get(clave) || {
+      cantidad: 0,
+      costo: 0,
+    };
+    acumulado.cantidad += Number(fila.cantidad || 0);
+    acumulado.costo += Number(fila.costo_total || 0);
+    costoRentabilidadPorNombre.set(clave, acumulado);
+  }
+
+  const costoUnitarioRentabilidad = new Map<string, number>();
+  for (const [clave, acumulado] of costoRentabilidadPorNombre) {
+    if (acumulado.cantidad > 0 && acumulado.costo > 0) {
+      costoUnitarioRentabilidad.set(
+        clave,
+        acumulado.costo / acumulado.cantidad
+      );
+    }
+  }
+
   const costoVinculado = new Map<string, number>();
   for (const vinculacion of vinculaciones || []) {
     const costo = costoPorId.get(
@@ -591,6 +637,7 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       const nombre = productoSeparado.nombre;
       const clave = normalizar(nombre);
       const costoUnitario =
+        costoUnitarioRentabilidad.get(clave) ??
         costoVinculado.get(clave) ??
         costoPorNombre.get(clave);
 
@@ -731,6 +778,7 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
       .map((producto) => {
         const clave = normalizar(producto.nombre);
         const costoUnitario =
+          costoUnitarioRentabilidad.get(clave) ??
           costoVinculado.get(clave) ??
           costoPorNombre.get(clave) ??
           0;

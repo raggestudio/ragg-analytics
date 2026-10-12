@@ -78,6 +78,8 @@ export function DashboardPage() {
     useState<RankingCanalItem[]>([]);
   const [resumenTurnos, setResumenTurnos] =
     useState<ResumenPedidosYaPorTurno | null>(null);
+  const [resumenTurnosAnterior, setResumenTurnosAnterior] =
+    useState<ResumenPedidosYaPorTurno | null>(null);
   const [vistaTurno, setVistaTurno] =
     useState<VistaTurnoPedidosYa>("total");
   const [insights, setInsights] = useState({
@@ -283,7 +285,7 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
   forzarActualizacion = false
 ) {
   const claveCache = [
-    "dashboard-cache-v9",
+    "dashboard-cache-v10",
     empresaId,
     periodoId,
     sucursalId || "todas",
@@ -333,6 +335,9 @@ function obtenerPeriodoIdsSeleccionados(): string[] {
           );
           setResumenTurnos(
             cache.resumenTurnos || null
+          );
+          setResumenTurnosAnterior(
+            cache.resumenTurnosAnterior || null
           );
           setInsights(
             cache.insights || {
@@ -391,6 +396,39 @@ const resumenTurnosData =
       })
     : null;
 
+let resumenTurnosAnteriorData: ResumenPedidosYaPorTurno | null = null;
+
+if (
+  empresaSeleccionada?.tipo_negocio === "restaurante" &&
+  modoAnalisis === "mensual"
+) {
+  const periodoActual = periodos.find(
+    (periodo) => periodo.id === periodoId
+  );
+
+  if (periodoActual) {
+    const fechaAnterior = new Date(
+      Number(periodoActual.anio),
+      Number(periodoActual.mes) - 2,
+      1
+    );
+    const periodoAnterior = periodos.find(
+      (periodo) =>
+        Number(periodo.anio) === fechaAnterior.getFullYear() &&
+        Number(periodo.mes) === fechaAnterior.getMonth() + 1
+    );
+
+    if (periodoAnterior) {
+      resumenTurnosAnteriorData =
+        await obtenerResumenPedidosYaPorTurno({
+          empresa_id: empresaId,
+          periodo_ids: [periodoAnterior.id],
+          sucursal_id: sucursalId || null,
+        });
+    }
+  }
+}
+
 const topPedidosYaUnificado =
   resumenTurnosData
     ? resumenTurnosData.total.top_productos.map(
@@ -420,6 +458,7 @@ const costosSabores = await obtenerCostosSaboresPedidosYa({
 setSaboresPedidosYa(sabores);
 setCostosSaboresPedidosYa(costosSabores);
 setResumenTurnos(resumenTurnosData);
+setResumenTurnosAnterior(resumenTurnosAnteriorData);
 
       setComparativo(comparativoData);
       setTopRentabilidad(topRentabilidadData);
@@ -455,6 +494,7 @@ sessionStorage.setItem(
     costosSaboresPedidosYa:
       costosSabores,
     resumenTurnos: resumenTurnosData,
+    resumenTurnosAnterior: resumenTurnosAnteriorData,
     insights: insightsCalculados,
   })
 );
@@ -565,6 +605,8 @@ function textoComparacion() {
   const anterior = comparativo?.anterior || null;
   const resumenTurnoActual =
     resumenTurnos?.[vistaTurno] || null;
+  const resumenTurnoAnterior =
+    resumenTurnosAnterior?.[vistaTurno] || null;
 
   if (empresaActual?.id === BERLIN_EMPRESA_ID) {
     return (

@@ -157,13 +157,18 @@ export async function obtenerDashboardResumen(input: {
   const { data: rentabilidad, error: rentabilidadError } = await rentabilidadQuery;
   if (rentabilidadError) throw rentabilidadError;
 
-  const { data: fuentes, error: fuentesError } = await supabase
-    .from("producto_ventas_resumen")
-    .select("fuente")
-    .eq("empresa_id", input.empresa_id)
-    .eq("periodo_id", input.periodo_id);
+  const { data: empresa, error: empresaError } = await supabase
+    .from("empresas")
+    .select("tipo_negocio")
+    .eq("id", input.empresa_id)
+    .single();
 
-  if (fuentesError) throw fuentesError;
+  if (empresaError) throw empresaError;
+
+  // El tipo de dashboard depende de la empresa, no de las fuentes
+  // cargadas en el mes. Duna sigue siendo restaurante aunque todavía
+  // no se haya importado Paradise para el período seleccionado.
+  const esRestaurante = empresa?.tipo_negocio === "restaurante";
 
   let ventasPyQuery = supabase
     .from("ventas")
@@ -245,9 +250,6 @@ export async function obtenerDashboardResumen(input: {
     0
   );
   
-  const esRestaurante = (fuentes || []).some(
-    (item: any) => item.fuente === "Paradise"
-  );
   const resumenPedidosYaTurnos = esRestaurante
     ? await obtenerResumenPedidosYaPorTurno({
         empresa_id: input.empresa_id,

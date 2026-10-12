@@ -1720,43 +1720,53 @@ function textoComparacion() {
 
               {resumen.es_restaurante ? (
                 <>
-                  <Metric title="PedidosYa" value={moneda(resumen.ventas_pedidosya)} />
-                  <Metric title="Paradise" value={moneda(resumen.ventas_paradise)} />
-                  <Metric title="Salón" value={moneda(resumen.ventas_salon || 0)} />
-                  <Metric title="Re Order" value={moneda(resumen.ventas_reorder || 0)} />
+                  {([
+                    ["PedidosYa", resumen.ventas_pedidosya, anterior?.ventas_pedidosya],
+                    ["Paradise", resumen.ventas_paradise, anterior?.ventas_paradise],
+                    ["Salón", resumen.ventas_salon || 0, anterior?.ventas_salon],
+                    ["Re Order", resumen.ventas_reorder || 0, anterior?.ventas_reorder],
+                  ] as const).map(([title, actual, previo]) => {
+                    const variacion = variacionPorcentual(actual, previo);
+                    return (
+                      <Metric
+                        key={title}
+                        title={title}
+                        value={moneda(actual)}
+                        variation={textoVariacion(variacion, "porcentaje")}
+                        variationColor={colorVariacion(variacion)}
+                      />
+                    );
+                  })}
 
-                  <Metric
-                    title="% PedidosYa"
-                    value={porcentaje(
+                  {([
+                    ["% PedidosYa", resumen.ventas_pedidosya, anterior?.ventas_pedidosya],
+                    ["% Paradise", resumen.ventas_paradise, anterior?.ventas_paradise],
+                    ["% Salón", resumen.ventas_salon || 0, anterior?.ventas_salon],
+                    ["% Re Order", resumen.ventas_reorder || 0, anterior?.ventas_reorder],
+                  ] as const).map(([title, actual, previo]) => {
+                    const participacionActual =
                       resumen.ventas_totales > 0
-                        ? (resumen.ventas_pedidosya / resumen.ventas_totales) * 100
-                        : 0
-                    )}
-                  />
-                  <Metric
-                    title="% Paradise"
-                    value={porcentaje(
-                      resumen.ventas_totales > 0
-                        ? (resumen.ventas_paradise / resumen.ventas_totales) * 100
-                        : 0
-                    )}
-                  />
-                  <Metric
-                    title="% Salón"
-                    value={porcentaje(
-                      resumen.ventas_totales > 0
-                        ? ((resumen.ventas_salon || 0) / resumen.ventas_totales) * 100
-                        : 0
-                    )}
-                  />
-                  <Metric
-                    title="% Re Order"
-                    value={porcentaje(
-                      resumen.ventas_totales > 0
-                        ? ((resumen.ventas_reorder || 0) / resumen.ventas_totales) * 100
-                        : 0
-                    )}
-                  />
+                        ? (actual / resumen.ventas_totales) * 100
+                        : 0;
+                    const participacionAnterior =
+                      anterior && anterior.ventas_totales > 0
+                        ? (Number(previo || 0) / anterior.ventas_totales) * 100
+                        : null;
+                    const variacion = variacionPuntos(
+                      participacionActual,
+                      participacionAnterior
+                    );
+
+                    return (
+                      <Metric
+                        key={title}
+                        title={title}
+                        value={porcentaje(participacionActual)}
+                        variation={textoVariacion(variacion, "puntos")}
+                        variationColor={colorVariacion(variacion)}
+                      />
+                    );
+                  })}
                 </>
               ) : (
                 <>

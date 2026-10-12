@@ -266,6 +266,7 @@ export function parsearFilasOrderDetailsPedidosYa(
         valorFila(fila, [
           "Cargo impositivo",
           "Cargos impositivos",
+          "Impuesto",
           "Impuestos",
           "Retenciones impositivas",
           "Taxes",
@@ -372,6 +373,10 @@ export function parsearFilasOrderDetailsPedidosYa(
             "Tarifa por pagos en línea",
             "Tarifa por pagos en linea",
             "Tarifa por pagos online",
+            "Comisión por pago en línea",
+            "Comision por pago en linea",
+            "Comisión pago en línea",
+            "Comision pago en linea",
             "Servicio pago en línea",
             "Servicio pago en linea",
             "Servicio de pago en línea",

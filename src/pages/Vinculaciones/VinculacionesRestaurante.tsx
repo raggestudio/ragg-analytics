@@ -46,7 +46,8 @@ function normalizar(texto: string) {
     .replace(/\bgin\s+tonic\b/g, "gintonic")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .replace(/^mila\s*pasta$/, "mila pasta");
 }
 
 function palabras(texto: string) {

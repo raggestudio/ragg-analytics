@@ -43,7 +43,8 @@ function normalizar(texto: string) {
     .replace(/\bgin\s+tonic\b/g, "gintonic")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .replace(/^mila\s*pasta$/, "mila pasta");
 }
 
 function corregirNombreIsatech(texto: string) {
@@ -1117,9 +1118,14 @@ async function cargarProductosPedidosYa(
   const agrupados = new Map<string, any>();
 
   for (const producto of data || []) {
+    const nombreNormalizado = normalizar(
+      producto.nombre_producto
+    );
     const clave =
-      String(producto.codigo_producto || "").trim() ||
-      normalizar(producto.nombre_producto);
+      nombreNormalizado === "mila pasta"
+        ? "nombre:mila pasta"
+        : String(producto.codigo_producto || "").trim() ||
+          nombreNormalizado;
     const existente = agrupados.get(clave);
 
     if (existente) {

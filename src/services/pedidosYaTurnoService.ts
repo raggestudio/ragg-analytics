@@ -707,6 +707,57 @@ export async function obtenerResumenPedidosYaPorTurno(input: {
         : 0;
   }
 
+  /*
+   * rentabilidad_periodo es la fuente de verdad del costo total del canal.
+   * El detalle por turno puede usar nombres distintos a los productos ya
+   * vinculados; por eso conciliamos cualquier diferencia entre turnos según
+   * su venta efectiva, sin perder el costo que ya se pudo identificar.
+   */
+  const costoProductosOficial = (rentabilidadCostos || []).reduce(
+    (total, fila) => total + Number(fila.costo_total || 0),
+    0
+  );
+  const costoProductosAsignado =
+    porTurno.mediodia.costo_productos +
+    porTurno.noche.costo_productos;
+  const diferenciaCosto =
+    costoProductosOficial - costoProductosAsignado;
+
+  if (
+    costoProductosOficial > 0 &&
+    Math.abs(diferenciaCosto) > 0.01
+  ) {
+    const ventaEfectivaTotal =
+      porTurno.mediodia.venta_efectiva +
+      porTurno.noche.venta_efectiva;
+
+    for (const turno of ["mediodia", "noche"] as const) {
+      const participacion =
+        ventaEfectivaTotal > 0
+          ? porTurno[turno].venta_efectiva /
+            ventaEfectivaTotal
+          : 0.5;
+
+      porTurno[turno].costo_productos = Math.max(
+        porTurno[turno].costo_productos +
+          diferenciaCosto * participacion,
+        0
+      );
+      porTurno[turno].ganancia_neta =
+        porTurno[turno].venta_efectiva -
+        porTurno[turno].comision -
+        porTurno[turno].iva_comision -
+        porTurno[turno].tarifa_pago_linea -
+        porTurno[turno].costo_productos;
+      porTurno[turno].margen_porcentaje =
+        porTurno[turno].venta_efectiva > 0
+          ? (porTurno[turno].ganancia_neta /
+              porTurno[turno].venta_efectiva) *
+            100
+          : 0;
+    }
+  }
+
   for (const turno of ["mediodia", "noche"] as const) {
     const facturacionProductos = Array.from(
       productosPorTurno[turno].values()

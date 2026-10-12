@@ -265,8 +265,21 @@ export function parsearFilasOrderDetailsPedidosYa(
       const cargoImpositivo = numero(
         valorFila(fila, [
           "Cargo impositivo",
+          "Cargos impositivos",
           "Impuestos",
+          "Retenciones impositivas",
           "Taxes",
+        ])
+      );
+
+      const retencionInformada = numero(
+        valorFila(fila, [
+          "Retención recuperable",
+          "Retencion recuperable",
+          "Retención",
+          "Retencion",
+          "Retenciones",
+          "Tax withholding",
         ])
       );
 
@@ -315,7 +328,9 @@ export function parsearFilasOrderDetailsPedidosYa(
       );
 
       const retencionRecuperable = redondearImporte(
-        Math.max(cargoImpositivo - ivaComision, 0)
+        retencionInformada > 0
+          ? retencionInformada
+          : Math.max(cargoImpositivo - ivaComision, 0)
       );
 
       return {
@@ -350,8 +365,17 @@ export function parsearFilasOrderDetailsPedidosYa(
           valorFila(fila, [
             "Tarifa de pago en línea",
             "Tarifa de pago en linea",
+            "Tarifa de pago online",
+            "Tarifa por pago en línea",
+            "Tarifa por pago en linea",
+            "Tarifa por pago online",
+            "Tarifa por pagos en línea",
+            "Tarifa por pagos en linea",
+            "Tarifa por pagos online",
             "Servicio pago en línea",
             "Servicio pago en linea",
+            "Servicio de pago en línea",
+            "Servicio de pago en linea",
             "Online payment fee",
           ])
         ),

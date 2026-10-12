@@ -961,112 +961,113 @@ function textoComparacion() {
             <div style={metricGrid}>
   {resumen.es_restaurante ? (
     <>
-      <Metric
-        title="Facturación bruta PedidosYa"
-        value={moneda(
-          resumen.ventas_brutas_pedidosya
-        )}
-      />
+      {([
+        ["Facturación bruta PedidosYa", resumen.ventas_brutas_pedidosya, anterior?.ventas_brutas_pedidosya],
+        ["Descuentos financiados por Duna", resumen.descuento_local_pedidosya, anterior?.descuento_local_pedidosya],
+        ["Venta efectiva PedidosYa", resumen.ventas_pedidosya, anterior?.ventas_pedidosya],
+      ] as const).map(([title, actual, previo]) => {
+        const variacion = variacionPorcentual(actual, previo);
+        return (
+          <Metric
+            key={title}
+            title={title}
+            value={moneda(actual)}
+            variation={textoVariacion(variacion, "porcentaje")}
+            variationColor={colorVariacion(variacion)}
+          />
+        );
+      })}
 
       <Metric
-        title="Descuentos financiados por Duna"
-        value={moneda(
-          resumen.descuento_local_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Venta efectiva PedidosYa"
-        value={moneda(
-          resumen.ventas_pedidosya
-        )}
+        title="Pedidos entregados"
+        value={resumen.pedidos_pedidosya}
         variation={textoVariacion(
           variacionPorcentual(
-            resumen.ventas_pedidosya,
-            anterior?.ventas_pedidosya
+            resumen.pedidos_pedidosya,
+            anterior?.pedidos_pedidosya
           ),
           "porcentaje"
         )}
         variationColor={colorVariacion(
           variacionPorcentual(
-            resumen.ventas_pedidosya,
-            anterior?.ventas_pedidosya
+            resumen.pedidos_pedidosya,
+            anterior?.pedidos_pedidosya
           )
         )}
       />
 
       <Metric
-        title="Pedidos entregados"
-        value={resumen.pedidos_pedidosya}
-      />
-
-      <Metric
         title="Ticket efectivo promedio"
-        value={moneda(
-          resumen.ticket_pedidosya
+        value={moneda(resumen.ticket_pedidosya)}
+        variation={textoVariacion(
+          variacionPorcentual(
+            resumen.ticket_pedidosya,
+            anterior?.ticket_pedidosya
+          ),
+          "porcentaje"
+        )}
+        variationColor={colorVariacion(
+          variacionPorcentual(
+            resumen.ticket_pedidosya,
+            anterior?.ticket_pedidosya
+          )
         )}
       />
 
       <Metric
         title="Participación"
-        value={porcentaje(
-          resumen.participacion_pedidosya
+        value={porcentaje(resumen.participacion_pedidosya)}
+        variation={textoVariacion(
+          variacionPuntos(
+            resumen.participacion_pedidosya,
+            anterior?.participacion_pedidosya
+          ),
+          "puntos"
+        )}
+        variationColor={colorVariacion(
+          variacionPuntos(
+            resumen.participacion_pedidosya,
+            anterior?.participacion_pedidosya
+          )
         )}
       />
 
-      <Metric
-        title="Comisión PedidosYa 23%"
-        value={moneda(
-          resumen.comision_pedidosya
-        )}
-      />
-
-      <Metric
-        title="IVA de la comisión"
-        value={moneda(
-          resumen.iva_comision_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Comisión 23% + IVA"
-        value={moneda(
-          resumen.comision_mas_iva_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Tarifa de pago en línea"
-        value={moneda(
-          resumen.tarifa_pago_linea_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Retención recuperable"
-        value={moneda(
-          resumen.retencion_recuperable_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Costo de productos"
-        value={moneda(
-          resumen.costo_productos_pedidosya
-        )}
-      />
-
-      <Metric
-        title="Ganancia neta PedidosYa"
-        value={moneda(
-          resumen.margen_pedidosya
-        )}
-      />
+      {([
+        ["Comisión PedidosYa 23%", resumen.comision_pedidosya, anterior?.comision_pedidosya],
+        ["IVA de la comisión", resumen.iva_comision_pedidosya, anterior?.iva_comision_pedidosya],
+        ["Comisión 23% + IVA", resumen.comision_mas_iva_pedidosya, anterior?.comision_mas_iva_pedidosya],
+        ["Tarifa de pago en línea", resumen.tarifa_pago_linea_pedidosya, anterior?.tarifa_pago_linea_pedidosya],
+        ["Retención recuperable", resumen.retencion_recuperable_pedidosya, anterior?.retencion_recuperable_pedidosya],
+        ["Costo de productos", resumen.costo_productos_pedidosya, anterior?.costo_productos_pedidosya],
+        ["Ganancia neta PedidosYa", resumen.margen_pedidosya, anterior?.margen_pedidosya],
+      ] as const).map(([title, actual, previo]) => {
+        const variacion = variacionPorcentual(actual, previo);
+        return (
+          <Metric
+            key={title}
+            title={title}
+            value={moneda(actual)}
+            variation={textoVariacion(variacion, "porcentaje")}
+            variationColor={colorVariacion(variacion)}
+          />
+        );
+      })}
 
       <Metric
         title="Margen neto PedidosYa"
-        value={porcentaje(
-          resumen.margen_porcentaje_pedidosya
+        value={porcentaje(resumen.margen_porcentaje_pedidosya)}
+        variation={textoVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_pedidosya,
+            anterior?.margen_porcentaje_pedidosya
+          ),
+          "puntos"
+        )}
+        variationColor={colorVariacion(
+          variacionPuntos(
+            resumen.margen_porcentaje_pedidosya,
+            anterior?.margen_porcentaje_pedidosya
+          )
         )}
       />
     </>

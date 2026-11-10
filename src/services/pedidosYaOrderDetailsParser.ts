@@ -250,6 +250,8 @@ export function parsearFilasOrderDetailsPedidosYa(
       const articulos = valorFila(fila, [
         "Artículos",
         "Articulos",
+        "Artículos del pedido",
+        "Articulos del pedido",
         "Productos",
         "Items",
       ]);

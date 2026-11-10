@@ -207,6 +207,7 @@ export function ImportacionesPage() {
   const [ventasManualesPiu, setVentasManualesPiu] =
     useState<VentaManualPiu[]>([]);
   const [recetaVentaManualId, setRecetaVentaManualId] = useState("");
+  const [destinoVentaManual, setDestinoVentaManual] = useState("todas");
   const [kilosVentaManual, setKilosVentaManual] = useState("15");
   const [precioKgVentaManual, setPrecioKgVentaManual] = useState("350");
   const [guardandoVentaManual, setGuardandoVentaManual] = useState(false);
@@ -1113,6 +1114,12 @@ export function ImportacionesPage() {
     );
     const kilos = Number(kilosVentaManual.replace(",", "."));
     const precioKg = Number(precioKgVentaManual.replace(",", "."));
+    const sucursalesDestino =
+      destinoVentaManual === "todas"
+        ? sucursales
+        : sucursales.filter(
+            (sucursal) => sucursal.id === destinoVentaManual
+          );
 
     if (!periodo) {
       setMensaje("Seleccioná un período.");
@@ -1120,6 +1127,10 @@ export function ImportacionesPage() {
     }
     if (!receta) {
       setMensaje("Seleccioná la receta del sabor vendido.");
+      return;
+    }
+    if (sucursalesDestino.length === 0) {
+      setMensaje("Seleccioná la sucursal de la venta.");
       return;
     }
 
@@ -1134,7 +1145,9 @@ export function ImportacionesPage() {
         receta,
         kilos,
         precio_kg: precioKg,
-        sucursal_ids: sucursales.map((sucursal) => sucursal.id),
+        sucursal_ids: sucursalesDestino.map(
+          (sucursal) => sucursal.id
+        ),
       });
 
       await recalcularSucursalesPiu();
@@ -1146,7 +1159,9 @@ export function ImportacionesPage() {
         `Venta manual guardada: ${resultado.kilos_totales.toLocaleString(
           "es-UY"
         )} kg de ${receta.nombre} por ${moneda(resultado.venta_total)}. ` +
-          `Se distribuyó en partes iguales entre ${sucursales.length} sucursales.`
+          (destinoVentaManual === "todas"
+            ? `Se distribuyó en partes iguales entre ${sucursalesDestino.length} sucursales.`
+            : `Se asignó completa a ${sucursalesDestino[0].nombre}.`)
       );
     } catch (error: any) {
       console.error(error);
@@ -1301,9 +1316,9 @@ export function ImportacionesPage() {
         <section style={card}>
           <h3>Ventas manuales de PIÚ</h3>
           <p style={hint}>
-            Para ventas realizadas fuera de Isatech y PedidosYa. El importe y
-            los kilos se distribuyen en partes iguales entre todas las sucursales,
-            y el costo se toma de la receta elegida.
+            Para ventas realizadas fuera de Isatech y PedidosYa. Podés
+            asignarlas a una sucursal o repartirlas entre todas. El costo se
+            toma de la receta elegida.
           </p>
 
           <label style={label}>Sabor / receta</label>
@@ -1321,6 +1336,22 @@ export function ImportacionesPage() {
                 </option>
               ))
             )}
+          </select>
+
+          <label style={label}>Asignar venta a</label>
+          <select
+            style={input}
+            value={destinoVentaManual}
+            onChange={(e) => setDestinoVentaManual(e.target.value)}
+          >
+            <option value="todas">
+              Repartir entre todas las sucursales
+            </option>
+            {sucursales.map((sucursal) => (
+              <option key={sucursal.id} value={sucursal.id}>
+                Solo {sucursal.nombre}
+              </option>
+            ))}
           </select>
 
           <div style={manualGrid}>
@@ -1357,16 +1388,23 @@ export function ImportacionesPage() {
               )}
             </strong>
             {" · "}
-            {sucursales.length > 0
-              ? `${(
-                  Number(kilosVentaManual.replace(",", ".")) /
-                  sucursales.length
-                ).toLocaleString("es-UY")} kg y ${moneda(
-                  (Number(kilosVentaManual.replace(",", ".")) *
-                    Number(precioKgVentaManual.replace(",", "."))) /
+            {destinoVentaManual === "todas"
+              ? sucursales.length > 0
+                ? `${(
+                    Number(kilosVentaManual.replace(",", ".")) /
                     sucursales.length
-                )} por sucursal`
-              : "No hay sucursales cargadas"}
+                  ).toLocaleString("es-UY")} kg y ${moneda(
+                    (Number(kilosVentaManual.replace(",", ".")) *
+                      Number(precioKgVentaManual.replace(",", "."))) /
+                      sucursales.length
+                  )} por sucursal`
+                : "No hay sucursales cargadas"
+              : `Venta completa para ${
+                  sucursales.find(
+                    (sucursal) =>
+                      sucursal.id === destinoVentaManual
+                  )?.nombre || "la sucursal seleccionada"
+                }`}
           </p>
 
           <button

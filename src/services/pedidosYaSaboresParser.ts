@@ -149,12 +149,23 @@ export async function leerCsvSaboresPedidosYa(
   const columnasObligatorias = [
     "Fecha del pedido",
     "Estado del pedido",
-    "Artículos",
   ];
 
   const columnasFaltantes = columnasObligatorias.filter(
     (columna) => !preview.columnas.includes(columna)
   );
+  const columnaArticulos = preview.columnas.find((columna) =>
+    [
+      "Artículos",
+      "Articulos",
+      "Artículos del pedido",
+      "Articulos del pedido",
+    ].includes(columna)
+  );
+
+  if (!columnaArticulos) {
+    columnasFaltantes.push("Artículos / Artículos del pedido");
+  }
 
   if (columnasFaltantes.length > 0) {
     throw new Error(
@@ -179,7 +190,7 @@ export async function leerCsvSaboresPedidosYa(
   for (const fila of preview.filas) {
     const fecha = fechaDesdeTexto(fila["Fecha del pedido"]);
     const estado = fila["Estado del pedido"];
-    const articulos = fila["Artículos"];
+    const articulos = fila[columnaArticulos!];
 
     if (
       !fecha ||
